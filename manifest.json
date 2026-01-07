@@ -1,12 +1,12 @@
 {
-  "display_name": "世界書觸發檢視器",
+  "display_name": "世界書便利性",
   "loading_order": 10,
   "requires": [],
   "js": "index.js",
   "css": "style.css",
   "author": "包",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "homePage": "https://github.com/misikyG/world-info-viewer",
-  "description": "在聊天介面直觀查看已觸發的世界書條目"
+  "description": "升級世界書使用體驗。"
 }
 

@@ -20,6 +20,8 @@ import {
   METADATA_KEY,
   selected_world_info,
   world_info,
+  world_names,
+  openWorldInfoEditor,
 } from '../../../world-info.js';
 
 import { getCharaFilename } from '../../../utils.js';
@@ -374,4 +376,134 @@ eventSource.on(event_types.CHAT_CHANGED, () => {
       if (mesId) addViewButtonToMessage(mesId);
     });
   }, 500);
+});
+
+// ===== 角色世界書列表功能 =====
+
+/**
+ * 取得角色綁定的所有世界書
+ * @param {number} chid 角色 ID
+ * @returns {Array<{name: string, type: string}>} 世界書列表
+ */
+function getCharacterWorldBooks(chid) {
+  const books = [];
+  const character = characters?.[chid];
+  
+  if (!character) return books;
+  
+  // 主要世界書 (Primary Lorebook)
+  const primaryWorld = character?.data?.extensions?.world;
+  if (primaryWorld && world_names?.includes(primaryWorld)) {
+    books.push({ name: primaryWorld, type: 'primary' });
+  }
+  
+  // 額外世界書 (Additional Lorebooks)
+  const fileName = getCharaFilename?.(chid);
+  const extraCharLore = world_info?.charLore?.find?.((e) => e.name === fileName);
+  if (extraCharLore && Array.isArray(extraCharLore.extraBooks)) {
+    extraCharLore.extraBooks.forEach((bookName) => {
+      if (bookName && world_names?.includes(bookName)) {
+        books.push({ name: bookName, type: 'additional' });
+      }
+    });
+  }
+  
+  return books;
+}
+
+/**
+ * 建立角色世界書視窗的 HTML
+ * @param {Array<{name: string, type: string}>} books 世界書列表
+ * @returns {string} HTML 字串
+ */
+function createCharacterWorldBooksHTML(books) {
+  if (books.length === 0) {
+    return `
+      <div id="char-worldbooks-panel" class="char-worldbooks-panel">
+        <div class="char-worldbooks-header">
+          <span class="fa-solid fa-globe"></span>
+          <span>綁定的世界書</span>
+        </div>
+        <div class="char-worldbooks-empty">
+          此角色未綁定任何世界書
+        </div>
+      </div>
+    `;
+  }
+  
+  const bookItems = books.map((book) => {
+    const typeLabel = book.type === 'primary' ? '主要' : '額外';
+    const typeClass = book.type === 'primary' ? 'primary' : 'additional';
+    return `
+      <div class="char-worldbook-item" data-world-name="${book.name}">
+        <span class="char-worldbook-type ${typeClass}">${typeLabel}</span>
+        <span class="char-worldbook-name">${book.name}</span>
+        <span class="char-worldbook-goto fa-solid fa-arrow-up-right-from-square" title="跳轉到世界書"></span>
+      </div>
+    `;
+  }).join('');
+  
+  return `
+    <div id="char-worldbooks-panel" class="char-worldbooks-panel">
+      <div class="char-worldbooks-header">
+        <span class="fa-solid fa-globe"></span>
+        <span>綁定的世界書</span>
+      </div>
+      <div class="char-worldbooks-list">
+        ${bookItems}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * 更新角色世界書面板
+ * @param {number} chid 角色 ID
+ */
+function updateCharacterWorldBooksPanel(chid) {
+  // 移除舊的面板
+  $('#char-worldbooks-panel').remove();
+  
+  // 取得角色的世界書
+  const books = getCharacterWorldBooks(chid);
+  
+  // 建立新的面板
+  const panelHTML = createCharacterWorldBooksHTML(books);
+  
+  // 找到 char-management-dropdown 的父元素並在其後插入
+  const dropdownLabel = $('#char-management-dropdown').closest('label');
+  if (dropdownLabel.length) {
+    dropdownLabel.after(panelHTML);
+  } else {
+    // 備用：直接插入到 avatar_controls
+    $('#avatar_controls').append(panelHTML);
+  }
+  
+  // 綁定點擊事件
+  $('.char-worldbook-item').on('click', function() {
+    const worldName = $(this).data('world-name');
+    if (worldName && typeof openWorldInfoEditor === 'function') {
+      openWorldInfoEditor(worldName);
+    }
+  });
+}
+
+/**
+ * 隱藏角色世界書面板
+ */
+function hideCharacterWorldBooksPanel() {
+  $('#char-worldbooks-panel').remove();
+}
+
+// 監聽角色編輯器開啟事件
+eventSource.on(event_types.CHARACTER_EDITOR_OPENED, (chid) => {
+  updateCharacterWorldBooksPanel(chid);
+});
+
+// 監聽角色編輯事件（世界書可能被修改）
+eventSource.on(event_types.CHARACTER_EDITED, (data) => {
+  const chid = data?.detail?.id;
+  if (chid !== undefined && $('#char-worldbooks-panel').length) {
+    updateCharacterWorldBooksPanel(chid);
+  }
 });
