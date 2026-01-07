@@ -6,7 +6,6 @@
   "css": "style.css",
   "author": "包",
   "version": "2.0.0",
-  "homePage": "https://github.com/misikyG/world-info-viewer",
+  "homePage": "https://github.com/misikyG/World-Info-Suite",
   "description": "Enhanced World Info management tools - includes triggered entry viewer, bulk editor, and character lorebook quick access."
 }
-
