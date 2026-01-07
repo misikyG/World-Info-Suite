@@ -1,12 +1,12 @@
 {
-  "display_name": "世界書便利性",
+  "display_name": "World Info Suite",
   "loading_order": 10,
   "requires": [],
   "js": "index.js",
   "css": "style.css",
   "author": "包",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "homePage": "https://github.com/misikyG/world-info-viewer",
-  "description": "升級世界書使用體驗。"
+  "description": "Enhanced World Info management tools - includes triggered entry viewer, bulk editor, and character lorebook quick access."
 }
 

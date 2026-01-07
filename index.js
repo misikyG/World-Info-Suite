@@ -1,3 +1,11 @@
+// ============================================================
+// World Info Suite - Combined Extension for SillyTavern
+// Features:
+//   1. Triggered Entry Viewer - View triggered World Info per message
+//   2. Character Lorebook Quick Access - Quick jump to character's lorebooks
+//   3. Bulk Entry Editor - Batch edit World Info entries
+// ============================================================
+
 import {
   eventSource,
   event_types,
@@ -5,15 +13,19 @@ import {
   chat_metadata,
   characters,
   this_chid,
+  saveSettingsDebounced,
 } from '../../../../script.js';
 
 import {
-  renderExtensionTemplateAsync
+  extension_settings,
+  renderExtensionTemplateAsync,
 } from '../../../extensions.js';
 
 import {
   callGenericPopup,
-  POPUP_TYPE
+  POPUP_TYPE,
+  Popup,
+  POPUP_RESULT,
 } from '../../../popup.js';
 
 import {
@@ -22,41 +34,92 @@ import {
   world_info,
   world_names,
   openWorldInfoEditor,
+  createWorldInfoEntry,
+  deleteWorldInfoEntry,
+  loadWorldInfo,
+  saveWorldInfo,
+  newWorldInfoEntryDefinition,
+  moveWorldInfoEntry,
 } from '../../../world-info.js';
 
-import { getCharaFilename } from '../../../utils.js';
+import { getCharaFilename, delay } from '../../../utils.js';
+import { addLocaleData, getCurrentLocale, t } from '../../../i18n.js';
 
+// ===== Extension Info =====
 const url = new URL(import.meta.url);
 const extensionName = url.pathname.substring(url.pathname.lastIndexOf('extensions/') + 11, url.pathname.lastIndexOf('/'));
+const extensionFolderPath = `scripts/extensions/${extensionName}`;
 
-const positionInfo = {
-  0: { name: '角色設定前', emoji: '📙' },
-  1: { name: '角色設定後', emoji: '📙' },
-  2: { name: '作者註釋前', emoji: '📝' },
-  3: { name: '作者註釋後', emoji: '📝' },
-  4: { name: '依深度插入', emoji: '💉' },
-  5: { name: '範例前', emoji: '📄' },
-  6: { name: '範例後', emoji: '📄' },
-  7: { name: 'Outlet', emoji: '➡️' },
+// ===== Default Settings =====
+const defaultSettings = {
+  enableTriggeredViewer: true,
+  enableCharLorebook: true,
+  enableBulkEditor: true,
 };
+
+// ===== i18n System =====
+let localeData = {};
+
+async function loadLocaleData() {
+  const locale = getCurrentLocale();
+  const localeToLoad = locale.startsWith('zh') ? 'zh-tw' : 'en';
+
+  try {
+    const response = await fetch(`${extensionFolderPath}/locales/${localeToLoad}.json`);
+    if (response.ok) {
+      localeData = await response.json();
+      // Add to SillyTavern's i18n system
+      addLocaleData(locale, localeData);
+      console.log(`[${extensionName}] Loaded locale: ${localeToLoad}`);
+    }
+  } catch (error) {
+    console.warn(`[${extensionName}] Failed to load locale ${localeToLoad}, falling back to en`);
+    try {
+      const fallbackResponse = await fetch(`${extensionFolderPath}/locales/en.json`);
+      if (fallbackResponse.ok) {
+        localeData = await fallbackResponse.json();
+      }
+    } catch (e) {
+      console.error(`[${extensionName}] Failed to load fallback locale`);
+    }
+  }
+}
+
+function i18n(key, ...args) {
+  let text = localeData[key] || key;
+  // Replace {0}, {1}, etc. with arguments
+  args.forEach((arg, index) => {
+    text = text.replace(new RegExp(`\\{${index}\\}`, 'g'), arg);
+  });
+  return text;
+}
+
+// ===== Position & Status Info (with i18n) =====
+function getPositionInfo() {
+  return {
+    0: { name: i18n('positionBeforeCharDef'), emoji: '📙' },
+    1: { name: i18n('positionAfterCharDef'), emoji: '📙' },
+    2: { name: i18n('positionBeforeAN'), emoji: '📝' },
+    3: { name: i18n('positionAfterAN'), emoji: '📝' },
+    4: { name: i18n('positionAtDepth'), emoji: '💉' },
+    5: { name: i18n('positionBeforeExamples'), emoji: '📄' },
+    6: { name: i18n('positionAfterExamples'), emoji: '📄' },
+    7: { name: i18n('positionOutlet'), emoji: '➡️' },
+  };
+}
 
 const POSITION_SORT_ORDER = {
-  0: 0,
-  1: 1,
-  5: 2,
-  6: 3,
-  2: 4,
-  3: 5,
-  4: 6,
-  7: 7,
+  0: 0, 1: 1, 5: 2, 6: 3, 2: 4, 3: 5, 4: 6, 7: 7,
 };
 
-const selectiveLogicInfo = {
-  0: '包含任一 (AND ANY)',
-  1: '未完全包含 (NOT ALL)',
-  2: '完全不含 (NOT ANY)',
-  3: '包含全部 (AND ALL)',
-};
+function getSelectiveLogicInfo() {
+  return {
+    0: i18n('selectiveLogicAndAny'),
+    1: i18n('selectiveLogicNotAll'),
+    2: i18n('selectiveLogicNotAny'),
+    3: i18n('selectiveLogicAndAll'),
+  };
+}
 
 const WI_SOURCE_KEYS = {
   GLOBAL: 'global',
@@ -65,12 +128,14 @@ const WI_SOURCE_KEYS = {
   CHAT: 'chat',
 };
 
-const WI_SOURCE_DISPLAY = {
-  [WI_SOURCE_KEYS.GLOBAL]: '全域',
-  [WI_SOURCE_KEYS.CHARACTER_PRIMARY]: '主要知識',
-  [WI_SOURCE_KEYS.CHARACTER_ADDITIONAL]: '額外知識',
-  [WI_SOURCE_KEYS.CHAT]: '聊天知識',
-};
+function getWiSourceDisplay() {
+  return {
+    [WI_SOURCE_KEYS.GLOBAL]: i18n('sourceGlobal'),
+    [WI_SOURCE_KEYS.CHARACTER_PRIMARY]: i18n('sourceCharacterPrimary'),
+    [WI_SOURCE_KEYS.CHARACTER_ADDITIONAL]: i18n('sourceCharacterAdditional'),
+    [WI_SOURCE_KEYS.CHAT]: i18n('sourceChat'),
+  };
+}
 
 const ENTRY_SOURCE_TYPE = {
   ASSISTANT: 3,
@@ -79,35 +144,30 @@ const ENTRY_SOURCE_TYPE = {
 };
 
 // ===== Helper Functions =====
-
 function getRoleString(roleValue) {
-    if (roleValue === 0) return 'system';
-    if (roleValue === 1) return 'user';
-    if (roleValue === 2) return 'assistant';
-
-    if (typeof roleValue === 'string') {
-        const lowerRole = roleValue.toLowerCase().trim();
-        if (lowerRole === 'ai') return 'assistant';
-        return lowerRole;
-    }
-
-    return 'assistant';
+  if (roleValue === 0) return 'system';
+  if (roleValue === 1) return 'user';
+  if (roleValue === 2) return 'assistant';
+  if (typeof roleValue === 'string') {
+    const lowerRole = roleValue.toLowerCase().trim();
+    if (lowerRole === 'ai') return 'assistant';
+    return lowerRole;
+  }
+  return 'assistant';
 }
 
 function roleDisplayName(role) {
-  if (role === 'assistant') return '@AI';
-  if (role === 'user') return '@使用者';
-  if (role === 'system') return '@系統';
-  return '@AI';
+  if (role === 'assistant') return i18n('roleAssistant');
+  if (role === 'user') return i18n('roleUser');
+  if (role === 'system') return i18n('roleSystem');
+  return i18n('roleAssistant');
 }
 
 function getEntrySourceType(entry) {
   const role = getRoleString(entry.role);
-
   if (role === 'assistant') return ENTRY_SOURCE_TYPE.ASSISTANT;
   if (role === 'user') return ENTRY_SOURCE_TYPE.USER;
   if (role === 'system') return ENTRY_SOURCE_TYPE.SYSTEM;
-
   return ENTRY_SOURCE_TYPE.ASSISTANT;
 }
 
@@ -142,20 +202,20 @@ function getWISourceKey(entry) {
 
 function getSourceDisplayName(sourceKey) {
   if (!sourceKey) return '';
-  return WI_SOURCE_DISPLAY[sourceKey] || '';
+  return getWiSourceDisplay()[sourceKey] || '';
 }
 
 function getEntryStatus(entry) {
-  if (entry.constant === true) return { emoji: '🔵', name: '恆定 (Constant)' };
-  if (entry.vectorized === true) return { emoji: '🔗', name: '向量 (Vectorized)' };
-  return { emoji: '🟢', name: '關鍵字 (Keyword)' };
+  if (entry.constant === true) return { emoji: '🔵', name: i18n('statusConstant') };
+  if (entry.vectorized === true) return { emoji: '🔗', name: i18n('statusVectorized') };
+  return { emoji: '🟢', name: i18n('statusKeyword') };
 }
 
 function formatRoleDepthTag(entry) {
   const roleString = getRoleString(entry.role);
   const depth = entry.depth ?? null;
   if (depth == null) return '';
-  return `${roleDisplayName(roleString)} 深度 ${depth}`;
+  return `${roleDisplayName(roleString)} ${i18n('depthLabel')} ${depth}`;
 }
 
 const worldOrderCache = new Map();
@@ -169,7 +229,6 @@ function getWorldOrderByName(worldName) {
   let order = Number.MAX_SAFE_INTEGER;
 
   try {
-
     const candidates = [
       world_info?.worlds,
       world_info?.allWorlds,
@@ -193,8 +252,7 @@ function getWorldOrderByName(worldName) {
         }
       }
     }
-  } catch (err) {
-  }
+  } catch (err) { /* ignore */ }
 
   worldOrderCache.set(worldName, order);
   return order;
@@ -233,12 +291,14 @@ function compareOrderEntries(a, b) {
 
 function processWorldInfoData(activatedEntries) {
   const byPosition = {};
+  const positionInfo = getPositionInfo();
+  const selectiveLogicInfo = getSelectiveLogicInfo();
 
   activatedEntries.forEach((entryRaw) => {
     if (!entryRaw || typeof entryRaw !== 'object') return;
 
     const position = (typeof entryRaw.position === 'number') ? entryRaw.position : 0;
-    const posInfo = positionInfo[position] || { name: `未知位置 (${position})`, emoji: '❓' };
+    const posInfo = positionInfo[position] || { name: `${i18n('positionUnknown')} (${position})`, emoji: '❓' };
     const posKey = `pos_${position}`;
 
     if (!byPosition[posKey]) {
@@ -262,7 +322,7 @@ function processWorldInfoData(activatedEntries) {
     const processedEntry = {
       uid: entryRaw.uid,
       worldName: entryRaw.world,
-      entryName: entryRaw.comment || `條目 #${entryRaw.uid}`,
+      entryName: entryRaw.comment || `${i18n('entryLabel')} #${entryRaw.uid}`,
       sourceKey,
       sourceName,
       statusEmoji: status.emoji,
@@ -271,7 +331,7 @@ function processWorldInfoData(activatedEntries) {
       keys: Array.isArray(entryRaw.key) ? entryRaw.key.join(', ') : (typeof entryRaw.key === 'string' ? entryRaw.key : null),
       secondaryKeys: Array.isArray(entryRaw.keysecondary) ? entryRaw.keysecondary.join(', ') : null,
       selectiveLogicName: Array.isArray(entryRaw.keysecondary)
-        ? (selectiveLogicInfo?.[entryRaw.selectiveLogic] ?? `未知邏輯 (${entryRaw.selectiveLogic})`)
+        ? (selectiveLogicInfo?.[entryRaw.selectiveLogic] ?? `${i18n('selectiveLogicUnknown')} (${entryRaw.selectiveLogic})`)
         : null,
       depth: entryRaw.depth ?? null,
       displayDepth: (position === 4) ? (entryRaw.depth ?? null) : null,
@@ -293,14 +353,17 @@ function processWorldInfoData(activatedEntries) {
   });
 
   const groups = Object.values(byPosition).filter(g => g.entries.length > 0);
-
   groups.sort((a, b) => getPositionSortIndex(a.position) - getPositionSortIndex(b.position));
 
   return groups;
 }
 
-// ===== UI：訊息按鈕 =====
+// ============================================================
+// FEATURE 1: Triggered Entry Viewer
+// ============================================================
+
 function addViewButtonToMessage(messageId) {
+  if (!extension_settings.worldInfoSuite?.enableTriggeredViewer) return;
   if (!chat?.[messageId]?.extra?.worldInfoViewer) return;
 
   const messageElement = document.querySelector(`.mes[mesid="${messageId}"]`);
@@ -315,7 +378,7 @@ function addViewButtonToMessage(messageId) {
   const button = document.createElement('div');
   button.id = buttonId;
   button.className = 'mes_button worldinfo-viewer-btn fa-regular fa-globe';
-  button.title = '查看此回覆觸發的世界書';
+  button.title = i18n('viewerBtnTitle');
   button.addEventListener('click', (event) => {
     event.stopPropagation();
     showWorldInfoPopup(messageId);
@@ -324,80 +387,83 @@ function addViewButtonToMessage(messageId) {
   buttonContainer.prepend(button);
 }
 
-// ===== UI：彈窗 =====
 async function showWorldInfoPopup(messageId) {
   const worldInfoData = chat?.[messageId]?.extra?.worldInfoViewer;
   if (!worldInfoData) {
-    toastr.info('此訊息沒有紀錄的世界書觸發資料。');
+    toastr.info(i18n('noWorldInfoData'));
     return;
   }
 
   try {
-    const popupContent = await renderExtensionTemplateAsync(extensionName, 'popup', { positions: worldInfoData });
+    const popupContent = await renderExtensionTemplateAsync(extensionName, 'popup', {
+      positions: worldInfoData,
+      i18n: localeData,
+    });
     callGenericPopup(popupContent, POPUP_TYPE.TEXT, '', {
       wide: true,
       large: true,
-      okButton: '關閉',
+      okButton: i18n('popupClose'),
       allowVerticalScrolling: true,
     });
   } catch (error) {
-    console.error(`[${extensionName}] 渲染彈窗時發生錯誤:`, error);
-    toastr.error('無法渲染世界書彈窗，請檢查主控台日誌。');
+    console.error(`[${extensionName}] Error rendering popup:`, error);
+    toastr.error('Unable to render World Info popup');
   }
 }
 
-// ===== 狀態同步 =====
+// State sync for triggered viewer
 let lastActivatedWorldInfo = null;
 
-eventSource.on(event_types.WORLD_INFO_ACTIVATED, (data) => {
-  if (data && Array.isArray(data) && data.length > 0) {
-    lastActivatedWorldInfo = processWorldInfoData(data);
-  } else {
-    lastActivatedWorldInfo = null;
-  }
-});
+function initTriggeredViewer() {
+  eventSource.on(event_types.WORLD_INFO_ACTIVATED, (data) => {
+    if (!extension_settings.worldInfoSuite?.enableTriggeredViewer) return;
+    if (data && Array.isArray(data) && data.length > 0) {
+      lastActivatedWorldInfo = processWorldInfoData(data);
+    } else {
+      lastActivatedWorldInfo = null;
+    }
+  });
 
-eventSource.on(event_types.MESSAGE_RECEIVED, (messageId) => {
-  if (lastActivatedWorldInfo && chat?.[messageId] && !chat[messageId].is_user) {
-    if (!chat[messageId].extra) chat[messageId].extra = {};
-    chat[messageId].extra.worldInfoViewer = lastActivatedWorldInfo;
-    lastActivatedWorldInfo = null;
-  }
-});
+  eventSource.on(event_types.MESSAGE_RECEIVED, (messageId) => {
+    if (!extension_settings.worldInfoSuite?.enableTriggeredViewer) return;
+    if (lastActivatedWorldInfo && chat?.[messageId] && !chat[messageId].is_user) {
+      if (!chat[messageId].extra) chat[messageId].extra = {};
+      chat[messageId].extra.worldInfoViewer = lastActivatedWorldInfo;
+      lastActivatedWorldInfo = null;
+    }
+  });
 
-eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (messageId) => {
-  addViewButtonToMessage(String(messageId));
-});
+  eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (messageId) => {
+    addViewButtonToMessage(String(messageId));
+  });
 
-eventSource.on(event_types.CHAT_CHANGED, () => {
-  setTimeout(() => {
-    document.querySelectorAll('#chat .mes').forEach((messageElement) => {
-      const mesId = messageElement.getAttribute('mesid');
-      if (mesId) addViewButtonToMessage(mesId);
-    });
-  }, 500);
-});
+  eventSource.on(event_types.CHAT_CHANGED, () => {
+    setTimeout(() => {
+      document.querySelectorAll('#chat .mes').forEach((messageElement) => {
+        const mesId = messageElement.getAttribute('mesid');
+        if (mesId) addViewButtonToMessage(mesId);
+      });
+    }, 500);
+  });
+}
 
-// ===== 角色世界書列表功能 =====
+// ============================================================
+// FEATURE 2: Character Lorebook Quick Access
+// ============================================================
 
-/**
- * 取得角色綁定的所有世界書
- * @param {number} chid 角色 ID
- * @returns {Array<{name: string, type: string}>} 世界書列表
- */
 function getCharacterWorldBooks(chid) {
   const books = [];
   const character = characters?.[chid];
-  
+
   if (!character) return books;
-  
-  // 主要世界書 (Primary Lorebook)
+
+  // Primary Lorebook
   const primaryWorld = character?.data?.extensions?.world;
   if (primaryWorld && world_names?.includes(primaryWorld)) {
     books.push({ name: primaryWorld, type: 'primary' });
   }
-  
-  // 額外世界書 (Additional Lorebooks)
+
+  // Additional Lorebooks
   const fileName = getCharaFilename?.(chid);
   const extraCharLore = world_info?.charLore?.find?.((e) => e.name === fileName);
   if (extraCharLore && Array.isArray(extraCharLore.extraBooks)) {
@@ -407,47 +473,42 @@ function getCharacterWorldBooks(chid) {
       }
     });
   }
-  
+
   return books;
 }
 
-/**
- * 建立角色世界書視窗的 HTML
- * @param {Array<{name: string, type: string}>} books 世界書列表
- * @returns {string} HTML 字串
- */
 function createCharacterWorldBooksHTML(books) {
   if (books.length === 0) {
     return `
       <div id="char-worldbooks-panel" class="char-worldbooks-panel">
         <div class="char-worldbooks-header">
           <span class="fa-solid fa-globe"></span>
-          <span>綁定的世界書</span>
+          <span data-i18n="charWorldbooksPanel">${i18n('charWorldbooksPanel')}</span>
         </div>
-        <div class="char-worldbooks-empty">
-          此角色未綁定任何世界書
+        <div class="char-worldbooks-empty" data-i18n="charWorldbooksEmpty">
+          ${i18n('charWorldbooksEmpty')}
         </div>
       </div>
     `;
   }
-  
+
   const bookItems = books.map((book) => {
-    const typeLabel = book.type === 'primary' ? '主要' : '額外';
+    const typeLabel = book.type === 'primary' ? i18n('charWorldbookTypePrimary') : i18n('charWorldbookTypeAdditional');
     const typeClass = book.type === 'primary' ? 'primary' : 'additional';
     return `
       <div class="char-worldbook-item" data-world-name="${book.name}">
         <span class="char-worldbook-type ${typeClass}">${typeLabel}</span>
         <span class="char-worldbook-name">${book.name}</span>
-        <span class="char-worldbook-goto fa-solid fa-arrow-up-right-from-square" title="跳轉到世界書"></span>
+        <span class="char-worldbook-goto fa-solid fa-arrow-up-right-from-square" title="${i18n('charWorldbookGotoTitle')}"></span>
       </div>
     `;
   }).join('');
-  
+
   return `
     <div id="char-worldbooks-panel" class="char-worldbooks-panel">
       <div class="char-worldbooks-header">
         <span class="fa-solid fa-globe"></span>
-        <span>綁定的世界書</span>
+        <span data-i18n="charWorldbooksPanel">${i18n('charWorldbooksPanel')}</span>
       </div>
       <div class="char-worldbooks-list">
         ${bookItems}
@@ -456,31 +517,22 @@ function createCharacterWorldBooksHTML(books) {
   `;
 }
 
-/**
- * 更新角色世界書面板
- * @param {number} chid 角色 ID
- */
 function updateCharacterWorldBooksPanel(chid) {
-  // 移除舊的面板
+  if (!extension_settings.worldInfoSuite?.enableCharLorebook) return;
+
   $('#char-worldbooks-panel').remove();
-  
-  // 取得角色的世界書
+
   const books = getCharacterWorldBooks(chid);
-  
-  // 建立新的面板
   const panelHTML = createCharacterWorldBooksHTML(books);
-  
-  // 找到 char-management-dropdown 的父元素並在其後插入
+
   const dropdownLabel = $('#char-management-dropdown').closest('label');
   if (dropdownLabel.length) {
     dropdownLabel.after(panelHTML);
   } else {
-    // 備用：直接插入到 avatar_controls
     $('#avatar_controls').append(panelHTML);
   }
-  
-  // 綁定點擊事件
-  $('.char-worldbook-item').on('click', function() {
+
+  $('.char-worldbook-item').on('click', function () {
     const worldName = $(this).data('world-name');
     if (worldName && typeof openWorldInfoEditor === 'function') {
       openWorldInfoEditor(worldName);
@@ -488,22 +540,560 @@ function updateCharacterWorldBooksPanel(chid) {
   });
 }
 
-/**
- * 隱藏角色世界書面板
- */
 function hideCharacterWorldBooksPanel() {
   $('#char-worldbooks-panel').remove();
 }
 
-// 監聽角色編輯器開啟事件
-eventSource.on(event_types.CHARACTER_EDITOR_OPENED, (chid) => {
-  updateCharacterWorldBooksPanel(chid);
-});
+function initCharLorebookQuickAccess() {
+  eventSource.on(event_types.CHARACTER_EDITOR_OPENED, (chid) => {
+    if (extension_settings.worldInfoSuite?.enableCharLorebook) {
+      updateCharacterWorldBooksPanel(chid);
+    }
+  });
 
-// 監聽角色編輯事件（世界書可能被修改）
-eventSource.on(event_types.CHARACTER_EDITED, (data) => {
-  const chid = data?.detail?.id;
-  if (chid !== undefined && $('#char-worldbooks-panel').length) {
-    updateCharacterWorldBooksPanel(chid);
+  eventSource.on(event_types.CHARACTER_EDITED, (data) => {
+    const chid = data?.detail?.id;
+    if (chid !== undefined && $('#char-worldbooks-panel').length) {
+      if (extension_settings.worldInfoSuite?.enableCharLorebook) {
+        updateCharacterWorldBooksPanel(chid);
+      }
+    }
+  });
+}
+
+// ============================================================
+// FEATURE 3: Bulk Entry Editor
+// ============================================================
+
+function initBulkEditor() {
+  const btn = document.createElement('div');
+  btn.id = 'wis-bulk-edit-btn';
+  btn.classList.add('wis-bulk-trigger', 'menu_button', 'fa-solid', 'fa-list-check');
+  btn.title = i18n('bulkEditBtnTitle');
+
+  btn.addEventListener('click', async () => {
+    if (!extension_settings.worldInfoSuite?.enableBulkEditor) {
+      toastr.warning('Bulk Editor is disabled');
+      return;
+    }
+
+    const sel = /** @type {HTMLSelectElement} */ (document.querySelector('#world_editor_select'));
+    if (!sel || /** @type {HTMLOptionElement} */ (sel.children[0])?.selected) {
+      toastr.warning(i18n('bulkEditNoWorldSelected'));
+      return;
+    }
+
+    const name = sel.selectedOptions[0].textContent;
+    const data = await loadWorldInfo(name);
+
+    // Create a template entry
+    const entry = createWorldInfoEntry(null, data);
+    await saveWorldInfo(name, data, true);
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+
+    // Wait for the template form to render
+    let form = document.querySelector(`#world_popup_entries_list .world_entry[uid="${entry.uid}"]`);
+    while (!form) {
+      await delay(100);
+      form = document.querySelector(`#world_popup_entries_list .world_entry[uid="${entry.uid}"]`);
+    }
+    form.querySelector('.inline-drawer-toggle')?.click();
+
+    const changeList = [];
+    const mapping = { 'selectiveLogic': 'entryLogicType' };
+    const noParent = ['content', 'entryStateSelector', 'entryKillSwitch'];
+
+    const hookInput = (key, inputs) => {
+      for (const input of inputs) {
+        const isSelect2 = input.classList.contains('select2-hidden-accessible') || input.style.display === 'none';
+
+        const getTargetElement = () => {
+          if (isSelect2) {
+            const next = input.nextElementSibling;
+            if (next && next.classList.contains('select2-container')) {
+              return next.querySelector('.select2-selection') || next;
+            }
+          }
+          if (noParent.includes(key)) return input;
+          return input.parentElement;
+        };
+
+        const targetElement = getTargetElement();
+
+        const addChange = () => {
+          if (!changeList.includes(key)) {
+            changeList.push(key);
+            if (targetElement) targetElement.style.setProperty('outline', '2px solid orange', 'important');
+          }
+        };
+
+        const removeChange = () => {
+          if (changeList.includes(key)) {
+            changeList.splice(changeList.indexOf(key), 1);
+            if (targetElement) targetElement.style.removeProperty('outline');
+          }
+        };
+
+        if (key !== 'entryKillSwitch') {
+          $(input).on('input change select2:select select2:unselect', addChange);
+        }
+
+        const clickTarget = isSelect2 ? targetElement : input;
+        if (clickTarget) {
+          clickTarget.addEventListener('click', (evt) => {
+            if (evt.ctrlKey) {
+              evt.preventDefault();
+              evt.stopImmediatePropagation();
+              if (changeList.includes(key)) {
+                removeChange();
+              } else {
+                addChange();
+              }
+            } else if (key === 'entryKillSwitch') {
+              addChange();
+            }
+          }, true);
+        }
+      }
+    };
+
+    // Hook all possible inputs
+    for (const key of Object.keys(newWorldInfoEntryDefinition)) {
+      let input = [...form.querySelectorAll(`[name="${mapping[key] ?? key}"]`)];
+      let snakeKey;
+      if (!input.length) {
+        snakeKey = key.replace(/([A-Z])/g, (_, c) => `_${c.toLowerCase()}`);
+        input = [...form.querySelectorAll(`[name="${snakeKey}"]`)];
+      }
+      if (input.length) {
+        hookInput(key, input);
+      }
+    }
+
+    // Manually hook special ones
+    hookInput('entryStateSelector', [...form.querySelectorAll('[name="entryStateSelector"]')]);
+    hookInput('entryKillSwitch', [...form.querySelectorAll('[name="entryKillSwitch"]')]);
+    hookInput('key', [...form.querySelectorAll('[name="key"]')]);
+    hookInput('keysecondary', [...form.querySelectorAll('[name="keysecondary"]')]);
+    hookInput('characterFilter', [
+      ...form.querySelectorAll('[name="characterFilter"]'),
+      ...form.querySelectorAll('[name="character_exclusion"]'),
+    ]);
+
+    // Build the dialog UI
+    const dom = document.createElement('div');
+    dom.classList.add('wis-bulk-dlg-main');
+
+    const head = document.createElement('h3');
+    head.textContent = `${i18n('bulkEditDialogTitle')} ${name}`;
+    dom.append(head);
+
+    const hint = document.createElement('small');
+    hint.textContent = i18n('bulkEditHint');
+    dom.append(hint);
+
+    const contentWrapper = document.createElement('div');
+    contentWrapper.classList.add('wis-bulk-content-wrapper');
+    dom.append(contentWrapper);
+
+    // Left panel: entry selection
+    const selectionPanel = document.createElement('div');
+    selectionPanel.classList.add('wis-bulk-selection-panel');
+
+    const selectionHeader = document.createElement('h4');
+    selectionHeader.textContent = i18n('bulkEditSelectEntries');
+    selectionPanel.append(selectionHeader);
+
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = i18n('bulkEditSearchPlaceholder');
+    searchInput.classList.add('text_pole');
+    searchInput.addEventListener('input', () => {
+      const searchTerm = searchInput.value.toLowerCase();
+      const labels = selectionPanel.querySelectorAll('.wis-bulk-entry-label');
+      labels.forEach((label) => {
+        const entryName = label.textContent.toLowerCase();
+        label.style.display = entryName.includes(searchTerm) ? '' : 'none';
+      });
+    });
+    selectionPanel.append(searchInput);
+
+    const selectionActions = document.createElement('div');
+    selectionActions.classList.add('wis-bulk-selection-actions');
+
+    const selectAllBtn = document.createElement('div');
+    selectAllBtn.textContent = i18n('bulkEditSelectAll');
+    selectAllBtn.classList.add('menu_button', 'menu_button_small');
+    selectAllBtn.addEventListener('click', () => {
+      selectionPanel.querySelectorAll('.wis-bulk-entry-checkbox').forEach((cb) => cb.checked = true);
+    });
+    selectionActions.append(selectAllBtn);
+
+    const deselectAllBtn = document.createElement('div');
+    deselectAllBtn.textContent = i18n('bulkEditDeselectAll');
+    deselectAllBtn.classList.add('menu_button', 'menu_button_small');
+    deselectAllBtn.addEventListener('click', () => {
+      selectionPanel.querySelectorAll('.wis-bulk-entry-checkbox').forEach((cb) => cb.checked = false);
+    });
+    selectionActions.append(deselectAllBtn);
+    selectionPanel.append(selectionActions);
+
+    const entryListContainer = document.createElement('div');
+    entryListContainer.classList.add('wis-bulk-entry-list');
+
+    Object.values(data.entries).filter((it) => it.uid !== entry.uid).forEach((e) => {
+      const label = document.createElement('label');
+      label.classList.add('wis-bulk-entry-label');
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.classList.add('wis-bulk-entry-checkbox');
+      checkbox.value = e.uid;
+
+      const text = document.createElement('span');
+      text.textContent = `[${e.uid}] ${e.comment || e.key.join(', ')}`;
+      text.title = `[${e.uid}] ${e.comment || e.key.join(', ')}`;
+
+      label.append(checkbox, text);
+      entryListContainer.append(label);
+    });
+    selectionPanel.append(entryListContainer);
+
+    // Right panel: template
+    const templatePanel = document.createElement('div');
+    templatePanel.classList.add('wis-bulk-template-panel');
+
+    const templateHeader = document.createElement('h4');
+    templateHeader.textContent = i18n('bulkEditTemplate');
+    templatePanel.append(templateHeader);
+    templatePanel.append(form);
+
+    contentWrapper.append(selectionPanel, templatePanel);
+
+    let okToClose = false;
+    let deleteTargets = false;
+
+    const dlg = new Popup(dom, POPUP_TYPE.CONFIRM, null, {
+      okButton: i18n('bulkEditApply'),
+      cancelButton: i18n('bulkEditCancel'),
+      large: true,
+      wider: true,
+      allowVerticalScrolling: true,
+      onClosing: () => okToClose,
+      customButtons: [
+        { text: i18n('bulkEditMoveCopy'), classes: ['wis-bulk-move-copy'] },
+        { text: i18n('bulkEditDelete'), classes: ['wis-bulk-delete', 'deleteworld_button'] },
+      ],
+    });
+
+    const prom = dlg.show();
+
+    // Handle OK button
+    dlg.dlg.querySelector('.popup-button-ok').addEventListener('click', async () => {
+      const selectedUids = [...entryListContainer.querySelectorAll('.wis-bulk-entry-checkbox:checked')].map((cb) => cb.value);
+
+      if (selectedUids.length === 0) {
+        toastr.warning(i18n('bulkEditNoEntriesSelected'));
+        return;
+      }
+      if (changeList.length === 0 && !deleteTargets) {
+        toastr.warning(i18n('bulkEditNoChanges'));
+        return;
+      }
+
+      let confirmationHtml = `<h3>${i18n('bulkEditConfirmTitle')}</h3><p>${i18n('bulkEditConfirmMsg', selectedUids.length)}</p><ul>`;
+
+      const tempBook = await loadWorldInfo(name);
+      const templateEntry = tempBook.entries[entry.uid];
+
+      for (const key of changeList) {
+        let newValue = templateEntry[key];
+        if (key === 'characterFilter') {
+          if (newValue) {
+            const names = newValue.names.join(', ') || i18n('labelNone');
+            const tags = newValue.tags.join(', ') || i18n('labelNone');
+            const mode = newValue.isExclude ? i18n('labelExclude') : i18n('labelOnly');
+            newValue = `${i18n('labelMode')}: ${mode}, ${i18n('labelCharacters')}: ${names}, ${i18n('labelTags')}: ${tags}`;
+          } else {
+            newValue = `<i>${i18n('labelDisabled')}</i>`;
+          }
+          confirmationHtml += `<li><b>${key}</b>: <pre>${newValue}</pre></li>`;
+          continue;
+        }
+        if (typeof newValue === 'boolean') {
+          newValue = newValue ? i18n('labelYes') : i18n('labelNo');
+        } else if (Array.isArray(newValue)) {
+          newValue = newValue.join(', ');
+        } else if (newValue === null || newValue === '') {
+          newValue = `<i>${i18n('labelEmpty')}</i>`;
+        }
+        confirmationHtml += `<li><b>${key}</b>: <pre>${newValue}</pre></li>`;
+      }
+      confirmationHtml += `</ul><p>${i18n('bulkEditConfirmIrreversible')}</p>`;
+
+      const confirmResult = await Popup.show.confirm(i18n('bulkEditConfirmTitle'), confirmationHtml, {
+        okButton: i18n('bulkEditConfirmOk'),
+        cancelButton: i18n('bulkEditConfirmCancel'),
+      });
+
+      if (confirmResult === POPUP_RESULT.AFFIRMATIVE) {
+        okToClose = true;
+        dlg.completeAffirmative();
+      }
+    });
+
+    // Handle Move/Copy button
+    dlg.dlg.querySelector('.wis-bulk-move-copy').addEventListener('click', async () => {
+      const selectedUids = [...entryListContainer.querySelectorAll('.wis-bulk-entry-checkbox:checked')].map((cb) => cb.value);
+
+      if (selectedUids.length === 0) {
+        toastr.warning(i18n('bulkEditNoEntriesSelected'));
+        return;
+      }
+
+      const moveCopyDom = document.createElement('div');
+      const moveCopyHead = document.createElement('h3');
+      moveCopyHead.textContent = i18n('moveCopyTitle');
+
+      const moveCopyInfo = document.createElement('p');
+      moveCopyInfo.textContent = i18n('moveCopyInfo', selectedUids.length);
+
+      const targetWorldSelect = document.createElement('select');
+      targetWorldSelect.classList.add('text_pole');
+      targetWorldSelect.style.width = '100%';
+
+      const sourceName = name;
+      world_names.forEach((worldName) => {
+        if (worldName !== sourceName) {
+          const option = document.createElement('option');
+          option.value = worldName;
+          option.textContent = worldName;
+          targetWorldSelect.append(option);
+        }
+      });
+
+      if (targetWorldSelect.options.length === 0) {
+        toastr.error(i18n('moveCopyNoTarget'));
+        return;
+      }
+
+      moveCopyDom.append(moveCopyHead, moveCopyInfo, targetWorldSelect);
+
+      const moveCopyPopup = new Popup(moveCopyDom, POPUP_TYPE.TEXT, null, {
+        okButton: false,
+        cancelButton: i18n('bulkEditCancel'),
+        customButtons: [
+          { text: i18n('moveCopyMove'), result: POPUP_RESULT.CUSTOM2 },
+          { text: i18n('moveCopyCopy'), result: POPUP_RESULT.CUSTOM1 },
+        ],
+      });
+
+      const moveCopyResult = await moveCopyPopup.show();
+
+      if (!moveCopyResult) return;
+
+      const targetName = targetWorldSelect.value;
+      if (!targetName) {
+        toastr.warning(i18n('moveCopyNoTargetSelected'));
+        return;
+      }
+
+      const deleteOriginal = moveCopyResult === POPUP_RESULT.CUSTOM2;
+
+      let successCount = 0;
+      let errorCount = 0;
+      for (const uid of selectedUids) {
+        const success = await moveWorldInfoEntry(sourceName, targetName, uid, { deleteOriginal });
+        if (success) {
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      }
+
+      const action = deleteOriginal ? i18n('moveCopyActionMoved') : i18n('moveCopyActionCopied');
+      toastr.success(i18n('moveCopySuccess', action, successCount, targetName));
+      if (errorCount > 0) {
+        toastr.error(i18n('moveCopyError', errorCount));
+      }
+
+      okToClose = true;
+      dlg.completeAffirmative();
+    });
+
+    // Handle Delete button
+    dlg.dlg.querySelector('.wis-bulk-delete').addEventListener('click', async () => {
+      const selectedUids = [...entryListContainer.querySelectorAll('.wis-bulk-entry-checkbox:checked')].map((cb) => cb.value);
+
+      if (selectedUids.length === 0) {
+        toastr.warning(i18n('bulkEditNoEntriesSelected'));
+        return;
+      }
+
+      const confirmResult = await Popup.show.confirm(
+        i18n('deleteConfirmTitle'),
+        i18n('deleteConfirmMsg', selectedUids.length),
+        { okButton: i18n('deleteConfirmOk'), cancelButton: i18n('bulkEditCancel') }
+      );
+
+      if (confirmResult) {
+        okToClose = true;
+        deleteTargets = true;
+        dlg.completeAffirmative();
+      }
+    });
+
+    // Handle Cancel button
+    dlg.dlg.querySelector('.popup-button-cancel').addEventListener('click', () => {
+      okToClose = true;
+      dlg.completeNegative();
+    });
+
+    // Observer for Select2 containers
+    const mo = new MutationObserver((muts) => {
+      for (const mut of muts) {
+        for (const n of [...mut.addedNodes].filter((it) => it instanceof HTMLElement && it.parentElement === document.body)) {
+          if (!(n instanceof HTMLElement)) continue;
+          if (n.classList.contains('select2-container')) {
+            dlg.dlg.append(n);
+          }
+        }
+      }
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+
+    const outcome = await prom;
+    mo.disconnect();
+
+    if (outcome === POPUP_RESULT.AFFIRMATIVE) {
+      const selectedUids = [...entryListContainer.querySelectorAll('.wis-bulk-entry-checkbox:checked')].map((cb) => cb.value);
+      const book = await loadWorldInfo(name);
+      const newEntry = book.entries[entry.uid];
+
+      for (const uid of selectedUids) {
+        if (deleteTargets) {
+          await deleteWorldInfoEntry(book, uid, { silent: true });
+        } else {
+          const e = book.entries[uid];
+          if (!e) continue;
+          for (const key of changeList) {
+            switch (key) {
+              case 'entryStateSelector':
+                e.constant = newEntry.constant;
+                e.vectorized = newEntry.vectorized;
+                break;
+              case 'entryKillSwitch':
+                e.disable = newEntry.disable;
+                break;
+              case 'characterFilter':
+                if (newEntry.characterFilter) {
+                  e.characterFilter = JSON.parse(JSON.stringify(newEntry.characterFilter));
+                } else {
+                  delete e.characterFilter;
+                }
+                break;
+              default:
+                if (Array.isArray(newEntry[key])) {
+                  e[key] = [...newEntry[key]];
+                } else {
+                  e[key] = newEntry[key];
+                }
+                break;
+            }
+          }
+        }
+      }
+
+      await deleteWorldInfoEntry(book, entry.uid, { silent: true });
+      await saveWorldInfo(name, book, true);
+
+      const action = deleteTargets ? i18n('bulkEditActionDeleted') : i18n('bulkEditActionModified');
+      toastr.success(i18n('bulkEditSuccess', action, selectedUids.length));
+    } else {
+      // Cancelled - clean up the template entry
+      const book = await loadWorldInfo(name);
+      await deleteWorldInfoEntry(book, entry.uid, { silent: true });
+      await saveWorldInfo(name, book, true);
+    }
+
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  // Insert the button
+  const anchor = document.querySelector('#world_apply_current_sorting');
+  if (anchor) {
+    anchor.insertAdjacentElement('afterend', btn);
   }
-});
+
+  // Update button visibility based on settings
+  updateBulkEditorVisibility();
+}
+
+function updateBulkEditorVisibility() {
+  const btn = document.getElementById('wis-bulk-edit-btn');
+  if (btn) {
+    btn.style.display = extension_settings.worldInfoSuite?.enableBulkEditor ? '' : 'none';
+  }
+}
+
+// ============================================================
+// Settings Panel
+// ============================================================
+
+async function loadSettings() {
+  // Initialize extension settings if not present
+  if (!extension_settings.worldInfoSuite) {
+    extension_settings.worldInfoSuite = { ...defaultSettings };
+  }
+
+  // Merge with defaults for any missing keys
+  extension_settings.worldInfoSuite = { ...defaultSettings, ...extension_settings.worldInfoSuite };
+
+  // Load and render settings HTML
+  const settingsHtml = await renderExtensionTemplateAsync(extensionName, 'settings');
+  $('#extensions_settings').append(settingsHtml);
+
+  // Bind checkbox states
+  $('#wis_enable_triggered_viewer').prop('checked', extension_settings.worldInfoSuite.enableTriggeredViewer);
+  $('#wis_enable_char_lorebook').prop('checked', extension_settings.worldInfoSuite.enableCharLorebook);
+  $('#wis_enable_bulk_editor').prop('checked', extension_settings.worldInfoSuite.enableBulkEditor);
+
+  // Bind change handlers
+  $('#wis_enable_triggered_viewer').on('change', function () {
+    extension_settings.worldInfoSuite.enableTriggeredViewer = $(this).prop('checked');
+    saveSettingsDebounced();
+  });
+
+  $('#wis_enable_char_lorebook').on('change', function () {
+    extension_settings.worldInfoSuite.enableCharLorebook = $(this).prop('checked');
+    if (!$(this).prop('checked')) {
+      hideCharacterWorldBooksPanel();
+    }
+    saveSettingsDebounced();
+  });
+
+  $('#wis_enable_bulk_editor').on('change', function () {
+    extension_settings.worldInfoSuite.enableBulkEditor = $(this).prop('checked');
+    updateBulkEditorVisibility();
+    saveSettingsDebounced();
+  });
+}
+
+// ============================================================
+// Initialization
+// ============================================================
+
+(async function init() {
+  // Load localization first
+  await loadLocaleData();
+
+  // Load settings and render settings panel
+  await loadSettings();
+
+  // Initialize features
+  initTriggeredViewer();
+  initCharLorebookQuickAccess();
+  initBulkEditor();
+
+  console.log(`[${extensionName}] World Info Suite initialized`);
+})();

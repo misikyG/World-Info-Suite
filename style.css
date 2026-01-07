@@ -1,4 +1,64 @@
-/* ===== 按鈕 ===== */
+/* ============================================================
+   World Info Suite - Combined Styles
+   ============================================================ */
+
+/* ===== Settings Panel ===== */
+.wis-settings {
+  margin-top: 10px;
+}
+
+.wis-settings-content {
+  padding: 10px 0;
+}
+
+.wis-settings-description {
+  color: var(--text-color-secondary);
+  font-size: 0.9em;
+  margin-bottom: 15px;
+}
+
+.wis-settings-content h4 {
+  margin: 10px 0;
+  color: var(--text-color);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 5px;
+}
+
+.wis-feature-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wis-feature-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--background-color-secondary);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.wis-feature-item.wis-feature-disabled {
+  opacity: 0.6;
+}
+
+.wis-feature-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.wis-feature-item small {
+  color: var(--text-color-secondary);
+  font-size: 0.85em;
+  margin-left: 24px;
+}
+
+/* ===== Triggered Entry Viewer Button ===== */
 .worldinfo-viewer-btn {
   cursor: pointer;
   opacity: 0.7;
@@ -271,4 +331,154 @@
   color: var(--text-color-secondary);
   font-size: 0.85em;
   font-style: italic;
+}
+
+/* ============================================================
+   Bulk Entry Editor Styles
+   ============================================================ */
+
+/* --- Bulk Edit Trigger Button --- */
+.wis-bulk-trigger {
+  cursor: pointer;
+}
+
+/* --- Main Dialog Container --- */
+.wis-bulk-dlg-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+}
+
+.wis-bulk-dlg-main h3 {
+  text-align: center;
+  margin-bottom: 0;
+}
+
+.wis-bulk-dlg-main small {
+  text-align: center;
+  color: var(--text-color-secondary);
+}
+
+/* --- Content Wrapper (Two-Column Layout) --- */
+.wis-bulk-content-wrapper {
+  display: flex;
+  flex-direction: row;
+  gap: 15px;
+  height: 100%;
+  min-height: 60vh;
+  overflow: hidden;
+}
+
+/* --- Left Panel: Entry Selection --- */
+.wis-bulk-selection-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 250px;
+  padding: 10px;
+  background-color: var(--bg1-color);
+  border-radius: var(--bor-rad);
+  border: 1px solid var(--border-color);
+  gap: 10px;
+}
+
+.wis-bulk-selection-panel h4 {
+  margin: 0 0 5px 0;
+  text-align: center;
+}
+
+.wis-bulk-selection-panel .text_pole {
+  width: 100%;
+}
+
+.wis-bulk-selection-actions {
+  display: flex;
+  justify-content: space-around;
+  gap: 10px;
+}
+
+.wis-bulk-selection-actions .menu_button_small {
+  flex: 1;
+}
+
+.wis-bulk-entry-list {
+  flex-grow: 1;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  padding: 5px;
+  border-radius: var(--bor-rad);
+  background-color: var(--bg0-color);
+}
+
+.wis-bulk-entry-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  user-select: none;
+}
+
+.wis-bulk-entry-label:hover {
+  background-color: var(--bg2-color);
+}
+
+.wis-bulk-entry-label span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-grow: 1;
+}
+
+.wis-bulk-entry-checkbox {
+  transform: scale(1.1);
+}
+
+/* --- Right Panel: Template --- */
+.wis-bulk-template-panel {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.wis-bulk-template-panel h4 {
+  margin: 0 0 15px 0;
+  text-align: center;
+}
+
+.wis-bulk-template-panel .world_entry {
+  flex-grow: 1;
+}
+
+/* --- Custom Buttons --- */
+.wis-bulk-delete {
+  background-color: var(--error-color) !important;
+  color: white !important;
+}
+
+.wis-bulk-delete:hover {
+  background-color: #e53935 !important;
+}
+
+/* --- Responsive: Narrow Screens --- */
+@media (max-width: 900px) {
+  .wis-bulk-content-wrapper {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  
+  .wis-bulk-selection-panel,
+  .wis-bulk-template-panel {
+    flex: none;
+    width: 100%;
+  }
+  
+  .wis-bulk-entry-list {
+    max-height: 250px;
+  }
 }

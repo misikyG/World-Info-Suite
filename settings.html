@@ -1,0 +1,52 @@
+<div id="world-info-suite-settings" class="wis-settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b data-i18n="extensionName">World Info Suite</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <div class="wis-settings-content">
+                <p class="wis-settings-description" data-i18n="extensionDescription">
+                    Enhanced World Info management tools
+                </p>
+                
+                <h4 data-i18n="settingsEnableFeatures">Enable/Disable Features</h4>
+                
+                <div class="wis-feature-toggles">
+                    <!-- Triggered Entry Viewer -->
+                    <div class="wis-feature-item">
+                        <label class="wis-feature-label" for="wis_enable_triggered_viewer">
+                            <input type="checkbox" id="wis_enable_triggered_viewer" checked />
+                            <span data-i18n="featureTriggeredEntryViewer">Triggered Entry Viewer</span>
+                        </label>
+                        <small data-i18n="featureTriggeredEntryViewerDesc">
+                            View which World Info entries were triggered for each AI response
+                        </small>
+                    </div>
+
+                    <!-- Character Lorebook Quick Access -->
+                    <div class="wis-feature-item">
+                        <label class="wis-feature-label" for="wis_enable_char_lorebook">
+                            <input type="checkbox" id="wis_enable_char_lorebook" checked />
+                            <span data-i18n="featureCharacterLorebookQuickAccess">Character Lorebook Quick Access</span>
+                        </label>
+                        <small data-i18n="featureCharacterLorebookQuickAccessDesc">
+                            Quick access panel to view and jump to character-bound lorebooks
+                        </small>
+                    </div>
+
+                    <!-- Bulk Entry Editor -->
+                    <div class="wis-feature-item">
+                        <label class="wis-feature-label" for="wis_enable_bulk_editor">
+                            <input type="checkbox" id="wis_enable_bulk_editor" checked />
+                            <span data-i18n="featureBulkEditor">Bulk Entry Editor</span>
+                        </label>
+                        <small data-i18n="featureBulkEditorDesc">
+                            Batch edit multiple World Info entries at once
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
