@@ -4,7 +4,7 @@
 
 /* ===== Settings Panel ===== */
 .wis-settings {
-  margin-top: 10px;
+  /* No extra margin - let inline-drawer handle its own spacing */
 }
 
 .wis-settings-content {
