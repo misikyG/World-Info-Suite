@@ -24,9 +24,9 @@ SillyTavern 擴充功能，提供增強的世界書 (World Info / Lorebook) 管�
 
 快速存取角色綁定的世界書。
 
-- 在角色編輯面板中顯示綁定的世界書列表
+- 在角色面板中顯示綁定的世界書
 - 區分主要世界書與額外世界書
-- 點擊即可直接跳轉到對應的世界書編輯器
+- 點擊即可直接跳轉到對應的世界書
 
 ### 3. 批量條目編輯器 (Bulk Entry Editor)
 
@@ -43,7 +43,7 @@ SillyTavern 擴充功能，提供增強的世界書 (World Info / Lorebook) 管�
 
 1. 下載或 clone 本擴充至 SillyTavern 的擴充資料夾：
    ```
-   SillyTavern/data/<user>/extensions/World-Info-Suite/
+   https://github.com/misikyG/World-Info-Suite
    ```
 2. 重新啟動 SillyTavern
 3. 在擴充功能設定中確認已啟用
