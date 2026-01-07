@@ -49,6 +49,12 @@
     "viewerBtnTitle": "View triggered World Info for this response",
     "noWorldInfoData": "No recorded World Info data for this message.",
 
+    "viewerCacheLimitLabel": "Cache limit (messages):",
+    "viewerCacheLimitDesc": "Number of recent messages to keep trigger data (0 = unlimited)",
+    "clearCacheBtn": "Clear All Cache",
+    "cacheClearedSuccess": "Cleared trigger data from {0} messages.",
+    "cacheClearedNone": "No cached trigger data to clear.",
+
     "charWorldbooksPanel": "Bound Lorebooks",
     "charWorldbooksEmpty": "No lorebooks bound to this character",
     "charWorldbookTypePrimary": "Primary",

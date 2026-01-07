@@ -55,6 +55,7 @@ const defaultSettings = {
   enableTriggeredViewer: true,
   enableCharLorebook: true,
   enableBulkEditor: true,
+  viewerCacheLimit: 10, // Maximum number of messages to keep World Info viewer data
 };
 
 // ===== i18n System =====
@@ -414,6 +415,50 @@ async function showWorldInfoPopup(messageId) {
 // State sync for triggered viewer
 let lastActivatedWorldInfo = null;
 
+// Clean up old World Info viewer data to limit cache size
+function cleanupViewerCache() {
+  if (!chat || !Array.isArray(chat)) return;
+  
+  const limit = extension_settings.worldInfoSuite?.viewerCacheLimit ?? 10;
+  if (limit <= 0) return; // 0 means unlimited
+  
+  // Find all messages with viewer data
+  const messagesWithData = [];
+  for (let i = 0; i < chat.length; i++) {
+    if (chat[i]?.extra?.worldInfoViewer) {
+      messagesWithData.push(i);
+    }
+  }
+  
+  // Remove data from older messages beyond the limit
+  if (messagesWithData.length > limit) {
+    const toRemove = messagesWithData.slice(0, messagesWithData.length - limit);
+    for (const idx of toRemove) {
+      if (chat[idx]?.extra?.worldInfoViewer) {
+        delete chat[idx].extra.worldInfoViewer;
+      }
+    }
+  }
+}
+
+// Clear all World Info viewer cache from current chat
+function clearAllViewerCache() {
+  if (!chat || !Array.isArray(chat)) return 0;
+  
+  let count = 0;
+  for (let i = 0; i < chat.length; i++) {
+    if (chat[i]?.extra?.worldInfoViewer) {
+      delete chat[i].extra.worldInfoViewer;
+      count++;
+    }
+  }
+  
+  // Remove viewer buttons from UI
+  document.querySelectorAll('.worldinfo-viewer-btn').forEach(btn => btn.remove());
+  
+  return count;
+}
+
 function initTriggeredViewer() {
   eventSource.on(event_types.WORLD_INFO_ACTIVATED, (data) => {
     if (!extension_settings.worldInfoSuite?.enableTriggeredViewer) return;
@@ -430,6 +475,9 @@ function initTriggeredViewer() {
       if (!chat[messageId].extra) chat[messageId].extra = {};
       chat[messageId].extra.worldInfoViewer = lastActivatedWorldInfo;
       lastActivatedWorldInfo = null;
+      
+      // Clean up old cache after adding new data
+      cleanupViewerCache();
     }
   });
 
@@ -1057,6 +1105,7 @@ async function loadSettings() {
   $('#wis_enable_triggered_viewer').prop('checked', extension_settings.worldInfoSuite.enableTriggeredViewer);
   $('#wis_enable_char_lorebook').prop('checked', extension_settings.worldInfoSuite.enableCharLorebook);
   $('#wis_enable_bulk_editor').prop('checked', extension_settings.worldInfoSuite.enableBulkEditor);
+  $('#wis_viewer_cache_limit').val(extension_settings.worldInfoSuite.viewerCacheLimit);
 
   // Bind change handlers
   $('#wis_enable_triggered_viewer').on('change', function () {
@@ -1076,6 +1125,25 @@ async function loadSettings() {
     extension_settings.worldInfoSuite.enableBulkEditor = $(this).prop('checked');
     updateBulkEditorVisibility();
     saveSettingsDebounced();
+  });
+
+  $('#wis_viewer_cache_limit').on('input', function () {
+    const value = parseInt($(this).val(), 10);
+    if (!isNaN(value) && value >= 0) {
+      extension_settings.worldInfoSuite.viewerCacheLimit = value;
+      saveSettingsDebounced();
+      // Apply cleanup with new limit
+      cleanupViewerCache();
+    }
+  });
+
+  $('#wis_clear_cache_btn').on('click', function () {
+    const count = clearAllViewerCache();
+    if (count > 0) {
+      toastr.success(i18n('cacheClearedSuccess', count));
+    } else {
+      toastr.info(i18n('cacheClearedNone'));
+    }
   });
 }
 

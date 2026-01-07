@@ -22,6 +22,24 @@
                         <small data-i18n="featureTriggeredEntryViewerDesc">
                             View which World Info entries were triggered for each AI response
                         </small>
+                        
+                        <!-- Cache Settings -->
+                        <div class="wis-cache-settings">
+                            <div class="wis-cache-limit-row">
+                                <label for="wis_viewer_cache_limit" data-i18n="viewerCacheLimitLabel">
+                                    Cache limit (messages):
+                                </label>
+                                <input type="number" id="wis_viewer_cache_limit" class="text_pole" min="0" max="100" value="10" />
+                            </div>
+                            <small data-i18n="viewerCacheLimitDesc">
+                                Number of recent messages to keep trigger data (0 = unlimited)
+                            </small>
+                            <div class="wis-cache-actions">
+                                <div id="wis_clear_cache_btn" class="menu_button menu_button_small" data-i18n="clearCacheBtn">
+                                    Clear All Cache
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Character Lorebook Quick Access -->

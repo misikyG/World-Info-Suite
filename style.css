@@ -58,6 +58,48 @@
   margin-left: 24px;
 }
 
+/* ===== Cache Settings ===== */
+.wis-cache-settings {
+  margin-top: 10px;
+  margin-left: 24px;
+  padding: 10px;
+  background: var(--background-color-tertiary);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.wis-cache-limit-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+
+.wis-cache-limit-row label {
+  flex-shrink: 0;
+  font-size: 0.9em;
+}
+
+.wis-cache-limit-row input {
+  width: 70px;
+  text-align: center;
+}
+
+.wis-cache-settings > small {
+  display: block;
+  margin-left: 0;
+  margin-bottom: 8px;
+  font-size: 0.8em;
+}
+
+.wis-cache-actions {
+  margin-top: 8px;
+}
+
+.wis-cache-actions .menu_button {
+  font-size: 0.85em;
+}
+
 /* ===== Triggered Entry Viewer Button ===== */
 .worldinfo-viewer-btn {
   cursor: pointer;

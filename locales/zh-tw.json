@@ -49,6 +49,12 @@
     "viewerBtnTitle": "查看此回覆觸發的世界書",
     "noWorldInfoData": "此訊息沒有紀錄的世界書觸發資料。",
 
+    "viewerCacheLimitLabel": "快取保留數量（訊息數）：",
+    "viewerCacheLimitDesc": "保留最近幾則訊息的觸發資料（0 = 無限制）",
+    "clearCacheBtn": "清除所有快取",
+    "cacheClearedSuccess": "已清除 {0} 則訊息的觸發資料。",
+    "cacheClearedNone": "沒有可清除的快取資料。",
+
     "charWorldbooksPanel": "綁定的世界書",
     "charWorldbooksEmpty": "此角色未綁定任何世界書",
     "charWorldbookTypePrimary": "主要",
