@@ -321,6 +321,8 @@
   margin-top: 8px;
   overflow: hidden;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .char-worldbooks-header {
@@ -346,12 +348,13 @@
 
 .char-worldbook-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   padding: 8px 12px;
   cursor: pointer;
   transition: background-color 0.2s;
   border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
 }
 
 .char-worldbook-item:last-child {
@@ -394,15 +397,10 @@
   min-width: 0;
   color: var(--text-color);
   font-size: 0.9em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* On hover, show full name in tooltip-style */
-.char-worldbook-item:hover .char-worldbook-name {
-  white-space: normal;
+  overflow-wrap: break-word;
   word-break: break-word;
+  white-space: normal;
+  line-height: 1.4;
 }
 
 .char-worldbook-goto {

@@ -649,6 +649,30 @@ function initCharLorebookQuickAccess() {
       }
     }
   });
+
+  // Use MutationObserver to detect popup close events for world info binding changes
+  // This is needed because ST doesn't emit events when auxiliary lorebooks are changed
+  const popupObserver = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      // Check for removed popup dialogs
+      for (const node of mutation.removedNodes) {
+        if (node instanceof HTMLElement && node.classList?.contains('popup')) {
+          // A popup was closed, check if we need to update the panel
+          if (currentEditorChid !== null && $('#char-worldbooks-panel').length) {
+            if (extension_settings.worldInfoSuite?.enableCharLorebook) {
+              // Small delay to ensure settings are saved
+              setTimeout(() => {
+                updateCharacterWorldBooksPanel(currentEditorChid);
+              }, 100);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // Observe the document body for popup removals
+  popupObserver.observe(document.body, { childList: true });
 }
 
 // ============================================================
