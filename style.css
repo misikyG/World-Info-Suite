@@ -58,6 +58,39 @@
   margin-left: 24px;
 }
 
+/* ===== Icon Settings ===== */
+.wis-icon-settings {
+  margin-top: 10px;
+  margin-left: 24px;
+  padding: 10px;
+  background: var(--background-color-tertiary);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.wis-icon-setting-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wis-icon-setting-row label {
+  flex-shrink: 0;
+  font-size: 0.9em;
+}
+
+.wis-icon-setting-row select {
+  flex: 1;
+  max-width: 180px;
+}
+
+.wis-icon-preview {
+  font-size: 1.2em;
+  color: var(--primary-color);
+  min-width: 24px;
+  text-align: center;
+}
+
 /* ===== Cache Settings ===== */
 .wis-cache-settings {
   margin-top: 10px;
@@ -351,13 +384,25 @@
   color: var(--background-color);
 }
 
+.char-worldbook-type.chat {
+  background: var(--accent-color, #17a2b8);
+  color: var(--background-color);
+}
+
 .char-worldbook-name {
   flex: 1;
+  min-width: 0;
   color: var(--text-color);
   font-size: 0.9em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* On hover, show full name in tooltip-style */
+.char-worldbook-item:hover .char-worldbook-name {
+  white-space: normal;
+  word-break: break-word;
 }
 
 .char-worldbook-goto {

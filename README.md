@@ -39,15 +39,6 @@ SillyTavern 擴充功能，提供增強的世界書 (World Info / Lorebook) 管�
 - 提供批量刪除條目的功能
 - 操作前會顯示確認對話框，列出所有將進行的變更
 
-## 安裝方式
-
-1. 下載或 clone 本擴充至 SillyTavern 的擴充資料夾：
-   ```
-   https://github.com/misikyG/World-Info-Suite
-   ```
-2. 重新啟動 SillyTavern
-3. 在擴充功能設定中確認已啟用
-
 ## 設定選項
 
 在 SillyTavern 的「擴充功能」設定面板中，可以：
@@ -55,12 +46,3 @@ SillyTavern 擴充功能，提供增強的世界書 (World Info / Lorebook) 管�
 - 啟用/停用各項功能
 - 調整觸發檢視器的快取保留數量
 - 清除所有快取的觸發資料
-
-## 相容性
-
-- 需要 SillyTavern 1.13.0 或更新版本
-- 支援繁體中文與英文介面
-
-## 作者
-
-包

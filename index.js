@@ -56,6 +56,7 @@ const defaultSettings = {
   enableCharLorebook: true,
   enableBulkEditor: true,
   viewerCacheLimit: 10, // Maximum number of messages to keep World Info viewer data
+  viewerIcon: 'fa-globe', // Icon for the viewer button
 };
 
 // ===== i18n System =====
@@ -370,22 +371,25 @@ function addViewButtonToMessage(messageId) {
   const messageElement = document.querySelector(`.mes[mesid="${messageId}"]`);
   if (!messageElement || messageElement.getAttribute('is_user') === 'true') return;
 
-  const buttonContainer = messageElement.querySelector('.mes_buttons');
-  if (!buttonContainer) return;
+  // Insert into extraMesButtons instead of mes_buttons to be part of the collapsible menu
+  const extraButtonsContainer = messageElement.querySelector('.extraMesButtons');
+  if (!extraButtonsContainer) return;
 
   const buttonId = `worldinfo-viewer-btn-${messageId}`;
   if (document.getElementById(buttonId)) return;
 
+  const iconClass = extension_settings.worldInfoSuite?.viewerIcon || 'fa-globe';
   const button = document.createElement('div');
   button.id = buttonId;
-  button.className = 'mes_button worldinfo-viewer-btn fa-regular fa-globe';
+  button.className = `mes_button worldinfo-viewer-btn fa-regular ${iconClass}`;
   button.title = i18n('viewerBtnTitle');
   button.addEventListener('click', (event) => {
     event.stopPropagation();
     showWorldInfoPopup(messageId);
   });
 
-  buttonContainer.prepend(button);
+  // Insert at the beginning of extraMesButtons
+  extraButtonsContainer.prepend(button);
 }
 
 async function showWorldInfoPopup(messageId) {
@@ -522,6 +526,12 @@ function getCharacterWorldBooks(chid) {
     });
   }
 
+  // Chat Lorebook
+  const chatLoreName = chat_metadata?.[METADATA_KEY];
+  if (chatLoreName && world_names?.includes(chatLoreName)) {
+    books.push({ name: chatLoreName, type: 'chat' });
+  }
+
   return books;
 }
 
@@ -541,8 +551,17 @@ function createCharacterWorldBooksHTML(books) {
   }
 
   const bookItems = books.map((book) => {
-    const typeLabel = book.type === 'primary' ? i18n('charWorldbookTypePrimary') : i18n('charWorldbookTypeAdditional');
-    const typeClass = book.type === 'primary' ? 'primary' : 'additional';
+    let typeLabel, typeClass;
+    if (book.type === 'primary') {
+      typeLabel = i18n('charWorldbookTypePrimary');
+      typeClass = 'primary';
+    } else if (book.type === 'chat') {
+      typeLabel = i18n('charWorldbookTypeChat');
+      typeClass = 'chat';
+    } else {
+      typeLabel = i18n('charWorldbookTypeAdditional');
+      typeClass = 'additional';
+    }
     return `
       <div class="char-worldbook-item" data-world-name="${book.name}">
         <span class="char-worldbook-type ${typeClass}">${typeLabel}</span>
@@ -593,7 +612,11 @@ function hideCharacterWorldBooksPanel() {
 }
 
 function initCharLorebookQuickAccess() {
+  // Store the currently opened chid for use in other event handlers
+  let currentEditorChid = null;
+
   eventSource.on(event_types.CHARACTER_EDITOR_OPENED, (chid) => {
+    currentEditorChid = chid;
     if (extension_settings.worldInfoSuite?.enableCharLorebook) {
       updateCharacterWorldBooksPanel(chid);
     }
@@ -602,8 +625,27 @@ function initCharLorebookQuickAccess() {
   eventSource.on(event_types.CHARACTER_EDITED, (data) => {
     const chid = data?.detail?.id;
     if (chid !== undefined && $('#char-worldbooks-panel').length) {
+      currentEditorChid = chid;
       if (extension_settings.worldInfoSuite?.enableCharLorebook) {
         updateCharacterWorldBooksPanel(chid);
+      }
+    }
+  });
+
+  // Listen for World Info settings updates (when lorebooks are bound/unbound)
+  eventSource.on(event_types.WORLDINFO_SETTINGS_UPDATED, () => {
+    if (currentEditorChid !== null && $('#char-worldbooks-panel').length) {
+      if (extension_settings.worldInfoSuite?.enableCharLorebook) {
+        updateCharacterWorldBooksPanel(currentEditorChid);
+      }
+    }
+  });
+
+  // Listen for chat changed event to update chat lorebook
+  eventSource.on(event_types.CHAT_CHANGED, () => {
+    if (currentEditorChid !== null && $('#char-worldbooks-panel').length) {
+      if (extension_settings.worldInfoSuite?.enableCharLorebook) {
+        updateCharacterWorldBooksPanel(currentEditorChid);
       }
     }
   });
@@ -1144,6 +1186,38 @@ async function loadSettings() {
     } else {
       toastr.info(i18n('cacheClearedNone'));
     }
+  });
+
+  // Bind viewer icon setting
+  const currentIcon = extension_settings.worldInfoSuite.viewerIcon || 'fa-globe';
+  $('#wis_viewer_icon').val(currentIcon);
+  updateIconPreview(currentIcon);
+
+  $('#wis_viewer_icon').on('change', function () {
+    const icon = $(this).val();
+    extension_settings.worldInfoSuite.viewerIcon = icon;
+    updateIconPreview(icon);
+    updateAllViewerButtonIcons(icon);
+    saveSettingsDebounced();
+  });
+}
+
+// Update icon preview in settings panel
+function updateIconPreview(iconClass) {
+  const preview = document.getElementById('wis_viewer_icon_preview');
+  if (preview) {
+    // Remove all fa-* classes except fa-regular
+    preview.className = preview.className.replace(/fa-[\w-]+/g, '').trim();
+    preview.classList.add('wis-icon-preview', 'fa-regular', iconClass);
+  }
+}
+
+// Update all existing viewer buttons with new icon
+function updateAllViewerButtonIcons(iconClass) {
+  document.querySelectorAll('.worldinfo-viewer-btn').forEach((btn) => {
+    // Remove old icon classes
+    btn.className = btn.className.replace(/fa-[\w-]+/g, '').trim();
+    btn.classList.add('mes_button', 'worldinfo-viewer-btn', 'fa-regular', iconClass);
   });
 }
 
