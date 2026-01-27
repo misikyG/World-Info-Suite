@@ -55,10 +55,23 @@
     "cacheClearedSuccess": "Cleared trigger data from {0} messages.",
     "cacheClearedNone": "No cached trigger data to clear.",
 
+    "viewerIconLabel": "Button icon:",
+    "iconGlobe": "Globe",
+    "iconBook": "Book",
+    "iconBookOpen": "Book Open",
+    "iconDatabase": "Database",
+    "iconScroll": "Scroll",
+    "iconFileLines": "File Lines",
+    "iconCircleInfo": "Circle Info",
+    "iconList": "List",
+    "iconMagnifyingGlass": "Magnifying Glass",
+    "iconLightbulb": "Lightbulb",
+
     "charWorldbooksPanel": "Bound Lorebooks",
     "charWorldbooksEmpty": "No lorebooks bound to this character",
     "charWorldbookTypePrimary": "Primary",
     "charWorldbookTypeAdditional": "Extra",
+    "charWorldbookTypeChat": "Chat",
     "charWorldbookGotoTitle": "Jump to lorebook",
 
     "bulkEditBtnTitle": "Bulk edit entries in this book",

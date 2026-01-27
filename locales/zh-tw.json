@@ -55,10 +55,23 @@
     "cacheClearedSuccess": "已清除 {0} 則訊息的觸發資料。",
     "cacheClearedNone": "沒有可清除的快取資料。",
 
+    "viewerIconLabel": "按鈕圖樣：",
+    "iconGlobe": "地球",
+    "iconBook": "書本",
+    "iconBookOpen": "打開的書",
+    "iconDatabase": "資料庫",
+    "iconScroll": "卷軸",
+    "iconFileLines": "文件",
+    "iconCircleInfo": "資訊",
+    "iconList": "列表",
+    "iconMagnifyingGlass": "放大鏡",
+    "iconLightbulb": "燈泡",
+
     "charWorldbooksPanel": "綁定的世界書",
     "charWorldbooksEmpty": "此角色未綁定任何世界書",
     "charWorldbookTypePrimary": "主要",
     "charWorldbookTypeAdditional": "額外",
+    "charWorldbookTypeChat": "聊天",
     "charWorldbookGotoTitle": "跳轉到世界書",
 
     "bulkEditBtnTitle": "批量編輯此書中的條目",
