@@ -381,8 +381,7 @@
 .char-worldbook-type.primary {
   background: rgba(255, 255, 255, 0);
   color: var(--SmartThemeBodyColor);
-  border: 1px solid var(--SmartThemeQuoteColor);
-  box-shadow: 0 1px 4px 0 var(--SmartThemeShadowColor);
+  border: 1px var(--SmartThemeQuoteColor);
 }
 
 .char-worldbook-type.additional {
