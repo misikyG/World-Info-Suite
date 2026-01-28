@@ -379,8 +379,10 @@
 }
 
 .char-worldbook-type.primary {
+  background: rgba(255, 255, 255, 0);
   color: var(--SmartThemeBodyColor);
-  border: 2px solid var(--SmartThemeQuoteColor);
+  border: 1px solid var(--SmartThemeQuoteColor);
+  box-shadow: 0 1px 4px 0 var(--SmartThemeShadowColor);
 }
 
 .char-worldbook-type.additional {
