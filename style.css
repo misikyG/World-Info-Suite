@@ -376,12 +376,13 @@
   border-radius: 4px;
   font-weight: bold;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .char-worldbook-type.primary {
   background: rgba(255, 255, 255, 0);
   color: var(--SmartThemeBodyColor);
-  border: 1px var(--SmartThemeQuoteColor);
+  border: 1.3px solid var(--SmartThemeQuoteColor);
 }
 
 .char-worldbook-type.additional {
