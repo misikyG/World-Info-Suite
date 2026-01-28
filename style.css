@@ -380,17 +380,17 @@
 
 .char-worldbook-type.primary {
   background: var(--SmartThemeQuoteColor);
-  color: var(--SmartThemeEmColor);
+  color: #c7c7c7;
 }
 
 .char-worldbook-type.additional {
   background: var(--SmartThemeUserMesBlurTintColor);
-  color: var(--SmartThemeEmColor);
+  color: #c7c7c7;
 }
 
 .char-worldbook-type.chat {
   background: var(--SmartThemeBotMesBlurTintColor);
-  color: var(--SmartThemeEmColor);
+  color: #c7c7c7;
 }
 
 .char-worldbook-name {
