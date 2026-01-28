@@ -379,18 +379,18 @@
 }
 
 .char-worldbook-type.primary {
-  background: var(--SmartThemeEmColor);
-  color: var(--background-color);
+  background: var(--SmartThemeQuoteColor);
+  color: var(--SmartThemeEmColor);
 }
 
 .char-worldbook-type.additional {
   background: var(--SmartThemeUserMesBlurTintColor);
-  color: var(--background-color);
+  color: var(--SmartThemeEmColor);
 }
 
 .char-worldbook-type.chat {
   background: var(--SmartThemeBotMesBlurTintColor);
-  color: var(--background-color);
+  color: var(--SmartThemeEmColor);
 }
 
 .char-worldbook-name {
