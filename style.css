@@ -139,7 +139,6 @@
   opacity: 0.7;
   transition: opacity 0.2s;
   position: relative;
-  top: 1px; 
 }
 .worldinfo-viewer-btn:hover {
   opacity: 1;
@@ -328,17 +327,19 @@
 .char-worldbooks-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 8px 12px;
   background: var(--background-color-tertiary);
   border-bottom: 1px solid var(--border-color);
   color: var(--text-color);
   font-weight: bold;
-  font-size: 0.9em;
+  font-size: 0.8em;
 }
 
 .char-worldbooks-header .fa-globe {
   color: var(--primary-color);
+  position: relative;
+  top: 1px;
 }
 
 .char-worldbooks-list {
@@ -375,21 +376,23 @@
   border-radius: 4px;
   font-weight: bold;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .char-worldbook-type.primary {
-  background: var(--primary-color);
-  color: var(--background-color);
+  background: rgba(255, 255, 255, 0);
+  color: var(--SmartThemeBodyColor);
+  border: 1.3px solid var(--SmartThemeQuoteColor);
 }
 
 .char-worldbook-type.additional {
-  background: var(--secondary-color, #6c757d);
-  color: var(--background-color);
+  background: var(--SmartThemeUserMesBlurTintColor);
+  color: var(--SmartThemeBodyColor);
 }
 
 .char-worldbook-type.chat {
-  background: var(--accent-color, #17a2b8);
-  color: var(--background-color);
+  background: var(--SmartThemeBotMesBlurTintColor);
+  color: var(--SmartThemeBodyColor);
 }
 
 .char-worldbook-name {
