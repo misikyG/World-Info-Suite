@@ -4,8 +4,8 @@
     
     "featureTriggeredEntryViewer": "觸發條目檢視器",
     "featureTriggeredEntryViewerDesc": "檢視每則 AI 回覆觸發了哪些世界書條目",
-    "featureCharacterLorebookQuickAccess": "角色世界書快速跳轉",
-    "featureCharacterLorebookQuickAccessDesc": "快速存取面板，可檢視並跳轉至角色綁定的世界書",
+    "featureCharacterLorebookQuickAccess": "世界書快速跳轉",
+    "featureCharacterLorebookQuickAccessDesc": "快速存取面板，可檢視並跳轉至綁定的世界書",
     "featureBulkEditor": "批量條目編輯器",
     "featureBulkEditorDesc": "一次批量編輯多個世界書條目",
 
@@ -72,6 +72,7 @@
     "charWorldbookTypePrimary": "主要",
     "charWorldbookTypeAdditional": "額外",
     "charWorldbookTypeChat": "聊天",
+    "charWorldbookTypeGlobal": "全域",
     "charWorldbookGotoTitle": "跳轉到世界書",
 
     "bulkEditBtnTitle": "批量編輯此書中的條目",
@@ -132,5 +133,10 @@
     "labelLogic": "邏輯：",
     "labelContent": "內容：",
 
-    "entryLabel": "條目"
+    "entryLabel": "條目",
+
+    "showGlobalLorebookMobile": "手機版顯示全域綁定",
+    "showGlobalLorebookDesktop": "電腦版顯示全域綁定",
+    "popupRenderError": "無法渲染世界書彈窗",
+    "bulkEditDisabled": "批量編輯器已停用"
 }

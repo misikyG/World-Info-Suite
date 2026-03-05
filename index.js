@@ -57,6 +57,8 @@ const defaultSettings = {
   enableBulkEditor: true,
   viewerCacheLimit: 10, // Maximum number of messages to keep World Info viewer data
   viewerIcon: 'fa-globe', // Icon for the viewer button
+  showGlobalLorebookMobile: true, // Show global lorebooks on mobile
+  showGlobalLorebookDesktop: true, // Show global lorebooks on desktop
 };
 
 // ===== i18n System =====
@@ -335,6 +337,7 @@ function processWorldInfoData(activatedEntries) {
       selectiveLogicName: Array.isArray(entryRaw.keysecondary)
         ? (selectiveLogicInfo?.[entryRaw.selectiveLogic] ?? `${i18n('selectiveLogicUnknown')} (${entryRaw.selectiveLogic})`)
         : null,
+      selectiveLogic: entryRaw.selectiveLogic ?? null,
       depth: entryRaw.depth ?? null,
       displayDepth: (position === 4) ? (entryRaw.depth ?? null) : null,
       roleDepthTag: (position === 4) ? formatRoleDepthTag(entryRaw) : null,
@@ -358,6 +361,42 @@ function processWorldInfoData(activatedEntries) {
   groups.sort((a, b) => getPositionSortIndex(a.position) - getPositionSortIndex(b.position));
 
   return groups;
+}
+
+// Re-translate stored world info data to current locale
+function retranslateWorldInfoData(worldInfoData) {
+  const positionInfo = getPositionInfo();
+  const selectiveLogicInfo = getSelectiveLogicInfo();
+  const statusEmojiMap = {
+    '🔵': () => i18n('statusConstant'),
+    '🔗': () => i18n('statusVectorized'),
+    '🟢': () => i18n('statusKeyword'),
+  };
+
+  return worldInfoData.map(group => {
+    const posInfo = positionInfo[group.position] || { name: `${i18n('positionUnknown')} (${group.position})`, emoji: '❓' };
+    return {
+      ...group,
+      positionName: posInfo.name,
+      positionEmoji: posInfo.emoji,
+      entries: group.entries.map(entry => {
+        const statusTranslator = statusEmojiMap[entry.statusEmoji];
+        let selectiveLogicName = entry.selectiveLogicName;
+        if (entry.secondaryKeys && entry.selectiveLogic != null) {
+          selectiveLogicName = selectiveLogicInfo[entry.selectiveLogic]
+            ?? `${i18n('selectiveLogicUnknown')} (${entry.selectiveLogic})`;
+        }
+        return {
+          ...entry,
+          entryName: entry.entryName || `${i18n('entryLabel')} #${entry.uid}`,
+          sourceName: entry.sourceKey ? getSourceDisplayName(entry.sourceKey) : (entry.sourceName || ''),
+          statusName: statusTranslator ? statusTranslator() : (entry.statusName || ''),
+          roleDepthTag: (group.position === 4 && entry.depth != null) ? formatRoleDepthTag(entry) : entry.roleDepthTag,
+          selectiveLogicName,
+        };
+      }),
+    };
+  });
 }
 
 // ============================================================
@@ -399,9 +438,12 @@ async function showWorldInfoPopup(messageId) {
     return;
   }
 
+  // Re-translate stored data to current locale before display
+  const translatedData = retranslateWorldInfoData(worldInfoData);
+
   try {
     const popupContent = await renderExtensionTemplateAsync(extensionName, 'popup', {
-      positions: worldInfoData,
+      positions: translatedData,
       i18n: localeData,
     });
     callGenericPopup(popupContent, POPUP_TYPE.TEXT, '', {
@@ -412,7 +454,7 @@ async function showWorldInfoPopup(messageId) {
     });
   } catch (error) {
     console.error(`[${extensionName}] Error rendering popup:`, error);
-    toastr.error('Unable to render World Info popup');
+    toastr.error(i18n('popupRenderError'));
   }
 }
 
@@ -503,6 +545,18 @@ function initTriggeredViewer() {
 // FEATURE 2: Character Lorebook Quick Access
 // ============================================================
 
+function isMobileDevice() {
+  return window.innerWidth <= 768;
+}
+
+function shouldShowGlobalLorebooks() {
+  const settings = extension_settings.worldInfoSuite;
+  if (isMobileDevice()) {
+    return settings?.showGlobalLorebookMobile ?? true;
+  }
+  return settings?.showGlobalLorebookDesktop ?? true;
+}
+
 function getCharacterWorldBooks(chid) {
   const books = [];
   const character = characters?.[chid];
@@ -532,6 +586,15 @@ function getCharacterWorldBooks(chid) {
     books.push({ name: chatLoreName, type: 'chat' });
   }
 
+  // Global Lorebooks (always at the end)
+  if (shouldShowGlobalLorebooks() && Array.isArray(selected_world_info)) {
+    selected_world_info.forEach((worldName) => {
+      if (worldName && world_names?.includes(worldName)) {
+        books.push({ name: worldName, type: 'global' });
+      }
+    });
+  }
+
   return books;
 }
 
@@ -558,6 +621,9 @@ function createCharacterWorldBooksHTML(books) {
     } else if (book.type === 'chat') {
       typeLabel = i18n('charWorldbookTypeChat');
       typeClass = 'chat';
+    } else if (book.type === 'global') {
+      typeLabel = i18n('charWorldbookTypeGlobal');
+      typeClass = 'global';
     } else {
       typeLabel = i18n('charWorldbookTypeAdditional');
       typeClass = 'additional';
@@ -687,7 +753,7 @@ function initBulkEditor() {
 
   btn.addEventListener('click', async () => {
     if (!extension_settings.worldInfoSuite?.enableBulkEditor) {
-      toastr.warning('Bulk Editor is disabled');
+      toastr.warning(i18n('bulkEditDisabled'));
       return;
     }
 
@@ -1184,6 +1250,20 @@ async function loadSettings() {
     if (!$(this).prop('checked')) {
       hideCharacterWorldBooksPanel();
     }
+    saveSettingsDebounced();
+  });
+
+  // Bind global lorebook toggles
+  $('#wis_show_global_lorebook_mobile').prop('checked', extension_settings.worldInfoSuite.showGlobalLorebookMobile);
+  $('#wis_show_global_lorebook_desktop').prop('checked', extension_settings.worldInfoSuite.showGlobalLorebookDesktop);
+
+  $('#wis_show_global_lorebook_mobile').on('change', function () {
+    extension_settings.worldInfoSuite.showGlobalLorebookMobile = $(this).prop('checked');
+    saveSettingsDebounced();
+  });
+
+  $('#wis_show_global_lorebook_desktop').on('change', function () {
+    extension_settings.worldInfoSuite.showGlobalLorebookDesktop = $(this).prop('checked');
     saveSettingsDebounced();
   });
 

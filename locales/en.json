@@ -4,8 +4,8 @@
     
     "featureTriggeredEntryViewer": "Triggered Entry Viewer",
     "featureTriggeredEntryViewerDesc": "View which World Info entries were triggered for each AI response",
-    "featureCharacterLorebookQuickAccess": "Character Lorebook Quick Access",
-    "featureCharacterLorebookQuickAccessDesc": "Quick access panel to view and jump to character-bound lorebooks",
+    "featureCharacterLorebookQuickAccess": "Lorebook Quick Access",
+    "featureCharacterLorebookQuickAccessDesc": "Quick access panel to view and jump to bound lorebooks",
     "featureBulkEditor": "Bulk Entry Editor",
     "featureBulkEditorDesc": "Batch edit multiple World Info entries at once",
 
@@ -72,6 +72,7 @@
     "charWorldbookTypePrimary": "Primary",
     "charWorldbookTypeAdditional": "Extra",
     "charWorldbookTypeChat": "Chat",
+    "charWorldbookTypeGlobal": "Global",
     "charWorldbookGotoTitle": "Jump to lorebook",
 
     "bulkEditBtnTitle": "Bulk edit entries in this book",
@@ -132,5 +133,10 @@
     "labelLogic": "Logic:",
     "labelContent": "Content:",
 
-    "entryLabel": "Entry"
+    "entryLabel": "Entry",
+
+    "showGlobalLorebookMobile": "Show global lorebooks on mobile",
+    "showGlobalLorebookDesktop": "Show global lorebooks on desktop",
+    "popupRenderError": "Unable to render World Info popup",
+    "bulkEditDisabled": "Bulk Editor is disabled"
 }

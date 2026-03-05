@@ -101,6 +101,26 @@
   border: 1px solid var(--border-color);
 }
 
+/* ===== Global Lorebook Display Settings ===== */
+.wis-global-lorebook-settings {
+  margin-top: 10px;
+  margin-left: 24px;
+  padding: 10px;
+  background: var(--background-color-tertiary);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wis-global-lorebook-row .wis-feature-label {
+  font-size: 0.9em;
+  font-weight: normal;
+}
+  border: 1px solid var(--border-color);
+}
+
 .wis-cache-limit-row {
   display: flex;
   align-items: center;
@@ -276,6 +296,21 @@
   color: var(--text-color-secondary);
   text-align: left;
 }
+.wi-details-content pre {
+  background: var(--background-color-tertiary);
+  border: 1px solid var(--border-color);
+  padding: 10px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 0.95em;
+  color: var(--text-color-secondary);
+  margin: 4px 0 0 0;
+}
 
 /* ===== 內容 ===== */
 .wi-entry-content {
@@ -393,6 +428,12 @@
 .char-worldbook-type.chat {
   background: var(--SmartThemeBotMesBlurTintColor);
   color: var(--SmartThemeBodyColor);
+}
+
+.char-worldbook-type.global {
+  color: var(--SmartThemeBodyColor);
+  font-style: italic;
+  opacity: 0.8;
 }
 
 .char-worldbook-name {
