@@ -118,8 +118,6 @@
   font-size: 0.9em;
   font-weight: normal;
 }
-  border: 1px solid var(--border-color);
-}
 
 .wis-cache-limit-row {
   display: flex;
@@ -463,6 +461,183 @@
 }
 
 /* ============================================================
+   Worldbook Sort & Keyword Manager
+   ============================================================ */
+
+.wis-worldbook-select2 .select2-selection--single {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wis-worldbook-select2 .select2-selection__rendered {
+  order: 2;
+  flex: 1;
+  min-width: 0;
+}
+
+.wis-worldbook-select2 .select2-selection__arrow {
+  order: 3;
+  position: static;
+  margin-left: auto;
+}
+
+.wis-worldbook-manage-btn {
+  order: 1;
+  cursor: pointer;
+  opacity: 0.72;
+  transition: opacity 0.2s;
+  color: var(--text-color-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  font-size: 0.95em;
+}
+
+.wis-worldbook-manage-btn:hover {
+  opacity: 1;
+  color: var(--primary-color);
+}
+
+.wis-worldbook-tag-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  width: 100%;
+}
+
+.wis-worldbook-tag-label {
+  font-size: 0.82em;
+  color: var(--text-color-secondary);
+  margin-right: 2px;
+}
+
+.wis-worldbook-tag-chip {
+  padding: 1px 8px;
+  font-size: 0.75em;
+}
+
+.wis-worldbook-tag-chip.active {
+  background: var(--primary-color);
+  color: var(--SmartThemeBodyColor, #fff);
+}
+
+.wis-worldbook-manager-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 60vh;
+}
+
+.wis-worldbook-manager-dialog h3 {
+  text-align: center;
+  margin-bottom: 0;
+}
+
+.wis-worldbook-manager-hint {
+  color: var(--text-color-secondary);
+}
+
+.wis-worldbook-manager-section {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 10px;
+  background: var(--background-color-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wis-worldbook-manager-section h4 {
+  margin: 0;
+  font-size: 0.95em;
+}
+
+.wis-worldbook-sort-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wis-worldbook-sort-btn.active {
+  background: var(--primary-color);
+  color: var(--SmartThemeBodyColor, #fff);
+}
+
+.wis-worldbook-manager-input-label {
+  font-size: 0.85em;
+  color: var(--text-color-secondary);
+}
+
+.wis-worldbook-inline-checkbox {
+  font-weight: normal;
+}
+
+.wis-worldbook-order-list {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--background-color-tertiary);
+}
+
+.wis-worldbook-order-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: default;
+}
+
+.wis-worldbook-order-item:last-child {
+  border-bottom: none;
+}
+
+.wis-worldbook-order-handle {
+  cursor: grab;
+  opacity: 0.8;
+}
+
+.wis-worldbook-order-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wis-worldbook-tag-editor-list {
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px;
+  background: var(--background-color-tertiary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wis-worldbook-tag-editor-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(180px, 2fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.wis-worldbook-tag-editor-name {
+  font-size: 0.85em;
+  color: var(--text-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================
    Bulk Entry Editor Styles
    ============================================================ */
 
@@ -562,6 +737,18 @@
   flex-grow: 1;
 }
 
+.wis-entry-content-inline-copy-btn {
+  margin-left: 6px;
+  min-width: 26px;
+  padding: 2px 6px;
+  line-height: 1;
+  opacity: 0.78;
+}
+
+.wis-entry-content-inline-copy-btn:hover {
+  opacity: 1;
+}
+
 .wis-bulk-entry-checkbox {
   transform: scale(1.1);
 }
@@ -609,5 +796,10 @@
   
   .wis-bulk-entry-list {
     max-height: 250px;
+  }
+
+  .wis-worldbook-tag-editor-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }

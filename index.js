@@ -55,11 +55,32 @@ const defaultSettings = {
   enableTriggeredViewer: true,
   enableCharLorebook: true,
   enableBulkEditor: true,
+  enableWorldbookManager: true,
   viewerCacheLimit: 10, // Maximum number of messages to keep World Info viewer data
   viewerIcon: 'fa-globe', // Icon for the viewer button
   showGlobalLorebookMobile: true, // Show global lorebooks on mobile
   showGlobalLorebookDesktop: true, // Show global lorebooks on desktop
 };
+
+const WORLDBOOK_SORT_MODE = {
+  CREATED_DESC: 'created_desc',
+  CREATED_ASC: 'created_asc',
+  NAME_ASC: 'name_asc',
+  NAME_DESC: 'name_desc',
+  CUSTOM: 'custom',
+};
+
+function createWorldbookManagerDefaults() {
+  return {
+    baseSort: WORLDBOOK_SORT_MODE.CREATED_DESC,
+    customOrder: [],
+    priorityKeywords: [],
+    prioritizeCharacterBound: false,
+    hiddenKeywords: [],
+    worldTags: {},
+    activeTagFilter: '',
+  };
+}
 
 // ===== i18n System =====
 let localeData = {};
@@ -291,6 +312,346 @@ function compareOrderEntries(a, b) {
   const wn = String(a.worldName || '').localeCompare(String(b.worldName || ''));
   if (wn !== 0) return wn;
   return String(a.entryName || '').localeCompare(String(b.entryName || ''));
+}
+
+function normalizeKeywordToken(value) {
+  return String(value ?? '').trim().toLocaleLowerCase();
+}
+
+function normalizeKeywordArray(value) {
+  const arr = Array.isArray(value)
+    ? value
+    : (typeof value === 'string' ? value.split(/[,\n]/) : []);
+
+  const seen = new Set();
+  const result = [];
+
+  for (const raw of arr) {
+    const cleaned = String(raw ?? '').trim();
+    if (!cleaned) continue;
+
+    const token = normalizeKeywordToken(cleaned);
+    if (seen.has(token)) continue;
+
+    seen.add(token);
+    result.push(cleaned);
+  }
+
+  return result;
+}
+
+function parseKeywordInput(value) {
+  return normalizeKeywordArray(typeof value === 'string' ? value : '');
+}
+
+function normalizeWorldTagMap(value) {
+  const output = {};
+
+  if (!value || typeof value !== 'object') {
+    return output;
+  }
+
+  Object.entries(value).forEach(([worldName, tags]) => {
+    if (typeof worldName !== 'string' || !worldName.trim()) return;
+
+    const normalized = normalizeKeywordArray(tags);
+    if (normalized.length > 0) {
+      output[worldName] = normalized;
+    }
+  });
+
+  return output;
+}
+
+function getAllConfiguredWorldbookTagsInternal(settings) {
+  const all = [];
+  const seen = new Set();
+
+  Object.values(settings?.worldTags || {}).forEach((tagList) => {
+    normalizeKeywordArray(tagList).forEach((tag) => {
+      const token = normalizeKeywordToken(tag);
+      if (!token || seen.has(token)) return;
+      seen.add(token);
+      all.push(tag);
+    });
+  });
+
+  return all.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+}
+
+function getWorldbookManagerSettings() {
+  if (!extension_settings.worldInfoSuite) {
+    extension_settings.worldInfoSuite = { ...defaultSettings };
+  }
+
+  const suite = extension_settings.worldInfoSuite;
+  const defaults = createWorldbookManagerDefaults();
+  const raw = (suite.worldbookManager && typeof suite.worldbookManager === 'object')
+    ? suite.worldbookManager
+    : {};
+
+  const normalized = {
+    ...defaults,
+    ...raw,
+    customOrder: Array.isArray(raw.customOrder) ? raw.customOrder.filter((x) => typeof x === 'string') : [],
+    priorityKeywords: normalizeKeywordArray(raw.priorityKeywords),
+    hiddenKeywords: normalizeKeywordArray(raw.hiddenKeywords),
+    prioritizeCharacterBound: Boolean(raw.prioritizeCharacterBound),
+    worldTags: normalizeWorldTagMap(raw.worldTags),
+    activeTagFilter: typeof raw.activeTagFilter === 'string' ? raw.activeTagFilter.trim() : '',
+  };
+
+  if (!Object.values(WORLDBOOK_SORT_MODE).includes(normalized.baseSort)) {
+    normalized.baseSort = WORLDBOOK_SORT_MODE.CREATED_DESC;
+  }
+
+  if (Array.isArray(world_names) && world_names.length > 0) {
+    const validNames = new Set(world_names);
+    normalized.customOrder = normalized.customOrder.filter((name) => validNames.has(name));
+
+    Object.keys(normalized.worldTags).forEach((name) => {
+      if (!validNames.has(name)) {
+        delete normalized.worldTags[name];
+      }
+    });
+  }
+
+  const allTags = getAllConfiguredWorldbookTagsInternal(normalized);
+  if (normalized.activeTagFilter && !allTags.some((tag) => normalizeKeywordToken(tag) === normalizeKeywordToken(normalized.activeTagFilter))) {
+    normalized.activeTagFilter = '';
+  }
+
+  suite.worldbookManager = normalized;
+  return normalized;
+}
+
+function getWorldbookTags(worldName, settings = getWorldbookManagerSettings()) {
+  if (!worldName) return [];
+  return normalizeKeywordArray(settings?.worldTags?.[worldName] || []);
+}
+
+function getAllConfiguredWorldbookTags() {
+  return getAllConfiguredWorldbookTagsInternal(getWorldbookManagerSettings());
+}
+
+function worldbookMatchesKeyword(worldName, keyword, settings = getWorldbookManagerSettings()) {
+  const needle = normalizeKeywordToken(keyword);
+  if (!needle) return false;
+
+  if (normalizeKeywordToken(worldName).includes(needle)) {
+    return true;
+  }
+
+  return getWorldbookTags(worldName, settings).some((tag) => normalizeKeywordToken(tag).includes(needle));
+}
+
+function worldbookHasTag(worldName, tag, settings = getWorldbookManagerSettings()) {
+  const needle = normalizeKeywordToken(tag);
+  if (!needle) return true;
+
+  return getWorldbookTags(worldName, settings).some((tagName) => normalizeKeywordToken(tagName) === needle);
+}
+
+function getCharacterBoundWorldbookSet() {
+  const bound = new Set();
+
+  const character = characters?.[this_chid];
+  const primaryWorld = character?.data?.extensions?.world;
+  if (primaryWorld) {
+    bound.add(primaryWorld);
+  }
+
+  const fileName = getCharaFilename?.(this_chid);
+  const extraCharLore = world_info?.charLore?.find?.((e) => e.name === fileName);
+  if (extraCharLore && Array.isArray(extraCharLore.extraBooks)) {
+    extraCharLore.extraBooks.forEach((bookName) => {
+      if (bookName) bound.add(bookName);
+    });
+  }
+
+  const chatLoreName = chat_metadata?.[METADATA_KEY];
+  if (chatLoreName) {
+    bound.add(chatLoreName);
+  }
+
+  return bound;
+}
+
+function getWorldbookCustomOrder(names, settings) {
+  const nameSet = new Set(names);
+  const order = settings.customOrder.filter((name) => nameSet.has(name));
+  const seen = new Set(order);
+
+  names.forEach((name) => {
+    if (!seen.has(name)) {
+      order.push(name);
+      seen.add(name);
+    }
+  });
+
+  return order;
+}
+
+function sortWorldbookNamesForManager(names, settings = getWorldbookManagerSettings()) {
+  const creationIndexMap = new Map(names.map((name, index) => [name, index]));
+  const customOrder = getWorldbookCustomOrder(names, settings);
+  const customOrderMap = new Map(customOrder.map((name, index) => [name, index]));
+  const characterBoundSet = getCharacterBoundWorldbookSet();
+
+  return [...names].sort((a, b) => {
+    const aKeywordPriority = settings.priorityKeywords.some((kw) => worldbookMatchesKeyword(a, kw, settings)) ? 1 : 0;
+    const bKeywordPriority = settings.priorityKeywords.some((kw) => worldbookMatchesKeyword(b, kw, settings)) ? 1 : 0;
+    if (aKeywordPriority !== bKeywordPriority) {
+      return bKeywordPriority - aKeywordPriority;
+    }
+
+    if (settings.prioritizeCharacterBound) {
+      const aBound = characterBoundSet.has(a) ? 1 : 0;
+      const bBound = characterBoundSet.has(b) ? 1 : 0;
+      if (aBound !== bBound) {
+        return bBound - aBound;
+      }
+    }
+
+    switch (settings.baseSort) {
+      case WORLDBOOK_SORT_MODE.CREATED_ASC:
+        return (creationIndexMap.get(a) ?? 0) - (creationIndexMap.get(b) ?? 0);
+      case WORLDBOOK_SORT_MODE.NAME_ASC:
+        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+      case WORLDBOOK_SORT_MODE.NAME_DESC:
+        return b.localeCompare(a, undefined, { sensitivity: 'base' });
+      case WORLDBOOK_SORT_MODE.CUSTOM: {
+        const aCustomIndex = customOrderMap.get(a) ?? Number.MAX_SAFE_INTEGER;
+        const bCustomIndex = customOrderMap.get(b) ?? Number.MAX_SAFE_INTEGER;
+        if (aCustomIndex !== bCustomIndex) {
+          return aCustomIndex - bCustomIndex;
+        }
+        return (creationIndexMap.get(a) ?? 0) - (creationIndexMap.get(b) ?? 0);
+      }
+      case WORLDBOOK_SORT_MODE.CREATED_DESC:
+      default:
+        return (creationIndexMap.get(b) ?? 0) - (creationIndexMap.get(a) ?? 0);
+    }
+  });
+}
+
+function getCurrentWorldEditorSelectionName() {
+  const sel = /** @type {HTMLSelectElement | null} */ (document.querySelector('#world_editor_select'));
+  if (!sel) return '';
+  if (sel.value === '') return '';
+
+  const idx = Number(sel.value);
+  if (!Number.isNaN(idx) && Array.isArray(world_names) && world_names[idx]) {
+    return world_names[idx];
+  }
+
+  return '';
+}
+
+let worldbookManagerRefreshTimer = null;
+let worldbookSelectObserver = null;
+let worldbookUiObserver = null;
+let worldbookPlaceholderOption;
+let isApplyingWorldbookOptions = false;
+let worldbookMutationSuppressedUntil = 0;
+
+function rebuildWorldEditorOptions(orderedNames, selectedName) {
+  const sel = /** @type {HTMLSelectElement | null} */ (document.querySelector('#world_editor_select'));
+  if (!sel || !Array.isArray(world_names)) return;
+
+  if (worldbookPlaceholderOption === undefined) {
+    const sourcePlaceholder = sel.querySelector('option[value=""]');
+    worldbookPlaceholderOption = sourcePlaceholder ? sourcePlaceholder.cloneNode(true) : false;
+    if (worldbookPlaceholderOption) {
+      worldbookPlaceholderOption.value = '';
+    }
+  }
+
+  const previousValue = sel.value;
+  const fragment = document.createDocumentFragment();
+  if (worldbookPlaceholderOption) {
+    fragment.append(worldbookPlaceholderOption.cloneNode(true));
+  }
+
+  const worldIndexMap = new Map(world_names.map((name, index) => [name, index]));
+  const added = new Set();
+
+  orderedNames.forEach((name) => {
+    const idx = worldIndexMap.get(name);
+    if (idx === undefined) return;
+
+    const option = new Option(name, String(idx));
+    if (name === selectedName) option.selected = true;
+    fragment.append(option);
+    added.add(name);
+  });
+
+  if (selectedName && !added.has(selectedName) && worldIndexMap.has(selectedName)) {
+    const selectedOption = new Option(
+      `${selectedName} ${i18n('worldManagerHiddenSelectedSuffix')}`,
+      String(worldIndexMap.get(selectedName)),
+      true,
+      true,
+    );
+    fragment.append(selectedOption);
+  }
+
+  worldbookMutationSuppressedUntil = Date.now() + 200;
+  isApplyingWorldbookOptions = true;
+  sel.replaceChildren(fragment);
+  isApplyingWorldbookOptions = false;
+
+  if (selectedName && worldIndexMap.has(selectedName)) {
+    const selectedValue = String(worldIndexMap.get(selectedName));
+    if (sel.querySelector(`option[value="${selectedValue}"]`)) {
+      sel.value = selectedValue;
+    }
+  }
+
+  if (sel.value === '' && sel.querySelector('option[value=""]')) {
+    sel.value = '';
+  }
+
+  if (sel.value !== previousValue) {
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  } else {
+    $(sel).trigger('change.select2');
+  }
+}
+
+function applyWorldbookManagerToEditorSelect() {
+  const sel = /** @type {HTMLSelectElement | null} */ (document.querySelector('#world_editor_select'));
+  if (!sel || !Array.isArray(world_names) || world_names.length === 0) {
+    return;
+  }
+
+  const selectedName = getCurrentWorldEditorSelectionName();
+
+  if (!extension_settings.worldInfoSuite?.enableWorldbookManager) {
+    rebuildWorldEditorOptions([...world_names], selectedName);
+    return;
+  }
+
+  const settings = getWorldbookManagerSettings();
+  const sortedNames = sortWorldbookNamesForManager(world_names, settings);
+  const hasActiveTagFilter = normalizeKeywordToken(settings.activeTagFilter) !== '';
+
+  const visibleNames = sortedNames.filter((name) => {
+    if (name === selectedName) return true;
+
+    if (!hasActiveTagFilter) {
+      const hiddenByKeyword = settings.hiddenKeywords.some((kw) => worldbookMatchesKeyword(name, kw, settings));
+      if (hiddenByKeyword) return false;
+    }
+
+    if (hasActiveTagFilter && !worldbookHasTag(name, settings.activeTagFilter, settings)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  rebuildWorldEditorOptions(visibleNames, selectedName);
 }
 
 function processWorldInfoData(activatedEntries) {
@@ -742,8 +1103,701 @@ function initCharLorebookQuickAccess() {
 }
 
 // ============================================================
-// FEATURE 3: Bulk Entry Editor
+// FEATURE 3: Worldbook Sort & Keyword Manager
 // ============================================================
+
+function renderWorldbookQuickTagBar(select2Container = null) {
+  const sel = /** @type {HTMLSelectElement | null} */ (document.querySelector('#world_editor_select'));
+  if (!sel) return;
+
+  const container = select2Container || sel.nextElementSibling;
+  if (!(container instanceof HTMLElement) || !container.classList.contains('select2')) return;
+
+  const controlRow = container.closest('.flex-container.alignitemscenter');
+  const host = container.parentElement || container;
+  let tagBar = document.querySelector('.wis-worldbook-tag-bar');
+  if (!tagBar) {
+    tagBar = document.createElement('div');
+    tagBar.classList.add('wis-worldbook-tag-bar');
+  }
+
+  if (controlRow instanceof HTMLElement) {
+    if (tagBar.previousElementSibling !== controlRow || tagBar.parentElement !== controlRow.parentElement) {
+      controlRow.insertAdjacentElement('afterend', tagBar);
+    }
+  } else if (tagBar.parentElement !== host) {
+    container.insertAdjacentElement('afterend', tagBar);
+  }
+
+  if (!extension_settings.worldInfoSuite?.enableWorldbookManager) {
+    tagBar.innerHTML = '';
+    tagBar.style.display = 'none';
+    return;
+  }
+
+  const settings = getWorldbookManagerSettings();
+  const tags = getAllConfiguredWorldbookTagsInternal(settings);
+
+  if (tags.length === 0) {
+    tagBar.innerHTML = '';
+    tagBar.style.display = 'none';
+    return;
+  }
+
+  tagBar.style.display = 'flex';
+  tagBar.innerHTML = '';
+
+  const label = document.createElement('span');
+  label.classList.add('wis-worldbook-tag-label');
+  label.textContent = i18n('worldManagerQuickFilterLabel');
+  tagBar.append(label);
+
+  const activeTagToken = normalizeKeywordToken(settings.activeTagFilter);
+
+  const makeChip = (displayText, tagValue, isActive) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.classList.add('menu_button', 'menu_button_small', 'wis-worldbook-tag-chip');
+    if (isActive) {
+      chip.classList.add('active');
+    }
+    chip.textContent = displayText;
+    chip.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const latest = getWorldbookManagerSettings();
+      latest.activeTagFilter = tagValue;
+      saveSettingsDebounced();
+      scheduleWorldbookManagerRefresh();
+    });
+    tagBar.append(chip);
+  };
+
+  makeChip(i18n('worldManagerQuickFilterAll'), '', activeTagToken === '');
+
+  tags.forEach((tag) => {
+    const token = normalizeKeywordToken(tag);
+    makeChip(tag, tag, token === activeTagToken);
+  });
+}
+
+function ensureWorldbookManagerControls() {
+  const sel = /** @type {HTMLSelectElement | null} */ (document.querySelector('#world_editor_select'));
+  if (!sel) return false;
+
+  const select2Container = sel.nextElementSibling;
+  if (!(select2Container instanceof HTMLElement) || !select2Container.classList.contains('select2')) {
+    return false;
+  }
+
+  select2Container.classList.add('wis-worldbook-select2');
+
+  const selection = select2Container.querySelector('.select2-selection--single');
+  const rendered = select2Container.querySelector('.select2-selection__rendered');
+
+  if (!(selection instanceof HTMLElement) || !(rendered instanceof HTMLElement)) {
+    return false;
+  }
+
+  let manageBtn = selection.querySelector('.wis-worldbook-manage-btn');
+  if (!manageBtn) {
+    manageBtn = document.createElement('span');
+    manageBtn.classList.add('wis-worldbook-manage-btn', 'fa-solid', 'fa-arrow-down-a-z');
+    manageBtn.setAttribute('role', 'button');
+    manageBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (!extension_settings.worldInfoSuite?.enableWorldbookManager) {
+        toastr.warning(i18n('worldManagerDisabled'));
+        return;
+      }
+
+      showWorldbookManagerDialog();
+    });
+
+    selection.insertBefore(manageBtn, rendered);
+  }
+
+  manageBtn.title = i18n('worldManagerBtnTitle');
+  manageBtn.style.display = extension_settings.worldInfoSuite?.enableWorldbookManager ? '' : 'none';
+
+  renderWorldbookQuickTagBar(select2Container);
+  return true;
+}
+
+async function showWorldbookManagerDialog() {
+  if (!Array.isArray(world_names) || world_names.length === 0) {
+    toastr.warning(i18n('worldManagerNoWorlds'));
+    return;
+  }
+
+  const settings = getWorldbookManagerSettings();
+  const names = [...world_names];
+  const customOrder = getWorldbookCustomOrder(names, settings);
+
+  const dom = document.createElement('div');
+  dom.classList.add('wis-worldbook-manager-dialog');
+
+  const title = document.createElement('h3');
+  title.textContent = i18n('worldManagerPopupTitle');
+  dom.append(title);
+
+  const hint = document.createElement('small');
+  hint.classList.add('wis-worldbook-manager-hint');
+  hint.textContent = i18n('worldManagerPopupHint');
+  dom.append(hint);
+
+  const createSection = (labelKey) => {
+    const section = document.createElement('section');
+    section.classList.add('wis-worldbook-manager-section');
+    const sectionTitle = document.createElement('h4');
+    sectionTitle.textContent = i18n(labelKey);
+    section.append(sectionTitle);
+    dom.append(section);
+    return section;
+  };
+
+  let selectedSort = settings.baseSort;
+
+  const simpleSortSection = createSection('worldManagerSectionSimpleSort');
+  const sortButtonGroup = document.createElement('div');
+  sortButtonGroup.classList.add('wis-worldbook-sort-buttons');
+  simpleSortSection.append(sortButtonGroup);
+
+  const sortOptions = [
+    { mode: WORLDBOOK_SORT_MODE.CREATED_DESC, key: 'worldManagerSortCreatedDesc' },
+    { mode: WORLDBOOK_SORT_MODE.CREATED_ASC, key: 'worldManagerSortCreatedAsc' },
+    { mode: WORLDBOOK_SORT_MODE.NAME_ASC, key: 'worldManagerSortNameAsc' },
+    { mode: WORLDBOOK_SORT_MODE.NAME_DESC, key: 'worldManagerSortNameDesc' },
+    { mode: WORLDBOOK_SORT_MODE.CUSTOM, key: 'worldManagerSortCustom' },
+  ];
+
+  const sortButtons = [];
+  const refreshSortButtonState = () => {
+    sortButtons.forEach(({ button, mode }) => {
+      button.classList.toggle('active', mode === selectedSort);
+    });
+  };
+
+  const updateCustomSectionVisibility = (section) => {
+    section.style.display = selectedSort === WORLDBOOK_SORT_MODE.CUSTOM ? '' : 'none';
+  };
+
+  sortOptions.forEach(({ mode, key }) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.classList.add('menu_button', 'menu_button_small', 'wis-worldbook-sort-btn');
+    button.textContent = i18n(key);
+    button.addEventListener('click', () => {
+      selectedSort = mode;
+      refreshSortButtonState();
+      updateCustomSectionVisibility(customSection);
+    });
+    sortButtonGroup.append(button);
+    sortButtons.push({ button, mode });
+  });
+
+  const prioritySection = createSection('worldManagerSectionPriority');
+
+  const priorityLabel = document.createElement('label');
+  priorityLabel.classList.add('wis-worldbook-manager-input-label');
+  priorityLabel.textContent = i18n('worldManagerPriorityKeywords');
+  prioritySection.append(priorityLabel);
+
+  const priorityInput = document.createElement('input');
+  priorityInput.type = 'text';
+  priorityInput.classList.add('text_pole');
+  priorityInput.placeholder = i18n('worldManagerPriorityKeywordsPlaceholder');
+  priorityInput.value = settings.priorityKeywords.join(', ');
+  prioritySection.append(priorityInput);
+
+  const boundPriorityLabel = document.createElement('label');
+  boundPriorityLabel.classList.add('wis-feature-label', 'wis-worldbook-inline-checkbox');
+  const boundPriorityCheckbox = document.createElement('input');
+  boundPriorityCheckbox.type = 'checkbox';
+  boundPriorityCheckbox.checked = Boolean(settings.prioritizeCharacterBound);
+  const boundPriorityText = document.createElement('span');
+  boundPriorityText.textContent = i18n('worldManagerPrioritizeBound');
+  boundPriorityLabel.append(boundPriorityCheckbox, boundPriorityText);
+  prioritySection.append(boundPriorityLabel);
+
+  const hideSection = createSection('worldManagerSectionHide');
+
+  const hiddenLabel = document.createElement('label');
+  hiddenLabel.classList.add('wis-worldbook-manager-input-label');
+  hiddenLabel.textContent = i18n('worldManagerHiddenKeywords');
+  hideSection.append(hiddenLabel);
+
+  const hiddenInput = document.createElement('input');
+  hiddenInput.type = 'text';
+  hiddenInput.classList.add('text_pole');
+  hiddenInput.placeholder = i18n('worldManagerHiddenKeywordsPlaceholder');
+  hiddenInput.value = settings.hiddenKeywords.join(', ');
+  hideSection.append(hiddenInput);
+
+  const customSection = createSection('worldManagerSectionCustomOrder');
+  const customHint = document.createElement('small');
+  customHint.classList.add('wis-worldbook-manager-hint');
+  customHint.textContent = i18n('worldManagerCustomOrderHint');
+  customSection.append(customHint);
+
+  const customOrderList = document.createElement('div');
+  customOrderList.classList.add('wis-worldbook-order-list');
+  customSection.append(customOrderList);
+
+  refreshSortButtonState();
+  updateCustomSectionVisibility(customSection);
+
+  customOrder.forEach((worldName) => {
+    const item = document.createElement('div');
+    item.classList.add('wis-worldbook-order-item');
+    item.dataset.worldName = worldName;
+
+    const handle = document.createElement('span');
+    handle.classList.add('wis-worldbook-order-handle', 'fa-solid', 'fa-grip-lines');
+    const nameEl = document.createElement('span');
+    nameEl.classList.add('wis-worldbook-order-name');
+    nameEl.textContent = worldName;
+
+    item.append(handle, nameEl);
+    customOrderList.append(item);
+  });
+
+  let sortableEnabled = false;
+  if (typeof $(customOrderList).sortable === 'function') {
+    sortableEnabled = true;
+    $(customOrderList).sortable({
+      items: '.wis-worldbook-order-item',
+      handle: '.wis-worldbook-order-handle',
+      axis: 'y',
+      tolerance: 'pointer',
+    });
+  }
+
+  const tagSection = createSection('worldManagerSectionTagEditor');
+
+  const tagSearchInput = document.createElement('input');
+  tagSearchInput.type = 'text';
+  tagSearchInput.classList.add('text_pole');
+  tagSearchInput.placeholder = i18n('worldManagerTagSearchPlaceholder');
+  tagSection.append(tagSearchInput);
+
+  const tagRowsWrap = document.createElement('div');
+  tagRowsWrap.classList.add('wis-worldbook-tag-editor-list');
+  tagSection.append(tagRowsWrap);
+
+  const tagRows = [];
+
+  customOrder.forEach((worldName) => {
+    const row = document.createElement('label');
+    row.classList.add('wis-worldbook-tag-editor-row');
+    row.dataset.worldName = worldName;
+
+    const nameEl = document.createElement('span');
+    nameEl.classList.add('wis-worldbook-tag-editor-name');
+    nameEl.textContent = worldName;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.classList.add('text_pole');
+    input.placeholder = i18n('worldManagerTagInputPlaceholder');
+    input.value = getWorldbookTags(worldName, settings).join(', ');
+
+    row.append(nameEl, input);
+    tagRowsWrap.append(row);
+    tagRows.push({ row, worldName, input });
+  });
+
+  tagSearchInput.addEventListener('input', () => {
+    const token = normalizeKeywordToken(tagSearchInput.value);
+
+    tagRows.forEach(({ row, worldName, input }) => {
+      if (!token) {
+        row.style.display = '';
+        return;
+      }
+
+      const inName = normalizeKeywordToken(worldName).includes(token);
+      const inTags = normalizeKeywordToken(input.value).includes(token);
+      row.style.display = (inName || inTags) ? '' : 'none';
+    });
+  });
+
+  const popup = new Popup(dom, POPUP_TYPE.CONFIRM, null, {
+    okButton: i18n('worldManagerApply'),
+    cancelButton: i18n('bulkEditCancel'),
+    large: true,
+    wider: true,
+    allowVerticalScrolling: true,
+  });
+
+  const result = await popup.show();
+
+  if (sortableEnabled) {
+    try {
+      if ($(customOrderList).sortable('instance') !== undefined) {
+        $(customOrderList).sortable('destroy');
+      }
+    } catch (_err) {
+      // ignore cleanup errors
+    }
+  }
+
+  if (result !== POPUP_RESULT.AFFIRMATIVE) {
+    return;
+  }
+
+  settings.baseSort = selectedSort;
+  settings.priorityKeywords = parseKeywordInput(priorityInput.value);
+  settings.hiddenKeywords = parseKeywordInput(hiddenInput.value);
+  settings.prioritizeCharacterBound = boundPriorityCheckbox.checked;
+  settings.customOrder = [...customOrderList.querySelectorAll('.wis-worldbook-order-item')]
+    .map((item) => item.dataset.worldName)
+    .filter(Boolean);
+
+  const worldTags = {};
+  tagRows.forEach(({ worldName, input }) => {
+    const tags = parseKeywordInput(input.value);
+    if (tags.length > 0) {
+      worldTags[worldName] = tags;
+    }
+  });
+  settings.worldTags = worldTags;
+
+  const availableTags = getAllConfiguredWorldbookTagsInternal(settings);
+  if (settings.activeTagFilter && !availableTags.some((tag) => normalizeKeywordToken(tag) === normalizeKeywordToken(settings.activeTagFilter))) {
+    settings.activeTagFilter = '';
+  }
+
+  saveSettingsDebounced();
+  scheduleWorldbookManagerRefresh();
+  toastr.success(i18n('worldManagerSaved'));
+}
+
+function refreshWorldbookManagerUI() {
+  const controlsReady = ensureWorldbookManagerControls();
+  if (!controlsReady) return;
+
+  applyWorldbookManagerToEditorSelect();
+  renderWorldbookQuickTagBar();
+}
+
+function scheduleWorldbookManagerRefresh() {
+  if (worldbookManagerRefreshTimer) {
+    clearTimeout(worldbookManagerRefreshTimer);
+  }
+
+  worldbookManagerRefreshTimer = setTimeout(() => {
+    worldbookManagerRefreshTimer = null;
+    refreshWorldbookManagerUI();
+  }, 80);
+}
+
+function initWorldbookManager() {
+  const bindSelectObserver = () => {
+    const sel = document.querySelector('#world_editor_select');
+    if (!sel) return;
+
+    if (worldbookSelectObserver) {
+      worldbookSelectObserver.disconnect();
+    }
+
+    worldbookSelectObserver = new MutationObserver(() => {
+      if (isApplyingWorldbookOptions) return;
+      if (Date.now() < worldbookMutationSuppressedUntil) return;
+      scheduleWorldbookManagerRefresh();
+    });
+
+    worldbookSelectObserver.observe(sel, { childList: true });
+  };
+
+  const trySetup = () => {
+    const ok = ensureWorldbookManagerControls();
+    if (!ok) return false;
+
+    bindSelectObserver();
+    scheduleWorldbookManagerRefresh();
+    return true;
+  };
+
+  if (!trySetup()) {
+    let retries = 0;
+    const retryTimer = setInterval(() => {
+      retries += 1;
+      if (trySetup() || retries > 40) {
+        clearInterval(retryTimer);
+      }
+    }, 250);
+  }
+
+  if (worldbookUiObserver) {
+    worldbookUiObserver.disconnect();
+  }
+
+  worldbookUiObserver = new MutationObserver(() => {
+    if (Date.now() < worldbookMutationSuppressedUntil) return;
+
+    const select2Container = document.querySelector('#world_editor_select + .select2');
+    if (select2Container && !select2Container.querySelector('.wis-worldbook-manage-btn')) {
+      scheduleWorldbookManagerRefresh();
+    }
+  });
+
+  worldbookUiObserver.observe(document.body, { childList: true, subtree: true });
+
+  eventSource.on(event_types.WORLDINFO_SETTINGS_UPDATED, () => {
+    scheduleWorldbookManagerRefresh();
+  });
+
+  eventSource.on(event_types.CHAT_CHANGED, () => {
+    scheduleWorldbookManagerRefresh();
+  });
+}
+
+function updateWorldbookManagerVisibility() {
+  const enabled = extension_settings.worldInfoSuite?.enableWorldbookManager;
+
+  const manageBtn = document.querySelector('.wis-worldbook-manage-btn');
+  if (manageBtn instanceof HTMLElement) {
+    manageBtn.style.display = enabled ? '' : 'none';
+  }
+
+  const tagBar = document.querySelector('.wis-worldbook-tag-bar');
+  if (tagBar instanceof HTMLElement) {
+    tagBar.style.display = enabled ? '' : 'none';
+  }
+
+  scheduleWorldbookManagerRefresh();
+}
+
+// ============================================================
+// FEATURE 4: Bulk Entry Editor
+// ============================================================
+
+async function copyTextToClipboard(text) {
+  const normalized = String(text ?? '');
+
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(normalized);
+      return true;
+    }
+  } catch (_err) {
+    // Fallback below
+  }
+
+  try {
+    const textArea = document.createElement('textarea');
+    textArea.value = normalized;
+    textArea.setAttribute('readonly', 'true');
+    textArea.style.position = 'fixed';
+    textArea.style.top = '-9999px';
+    textArea.style.left = '-9999px';
+    document.body.append(textArea);
+    textArea.select();
+    textArea.setSelectionRange(0, textArea.value.length);
+    const copied = document.execCommand('copy');
+    textArea.remove();
+    return copied;
+  } catch (_err) {
+    return false;
+  }
+}
+
+function getEntryDisplayTitle(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return i18n('entryLabel');
+  }
+
+  if (entry.comment && String(entry.comment).trim()) {
+    return String(entry.comment).trim();
+  }
+
+  if (Array.isArray(entry.key) && entry.key.length > 0) {
+    return entry.key.join(', ');
+  }
+
+  return `${i18n('entryLabel')} #${entry.uid ?? ''}`.trim();
+}
+
+async function copyEntryContentsByUid(entriesByUid, uids) {
+  const orderedUids = Array.isArray(uids) ? uids : [];
+  const entries = orderedUids
+    .map((uid) => entriesByUid?.[uid])
+    .filter((entry) => entry && typeof entry === 'object');
+
+  if (entries.length === 0) {
+    toastr.warning(i18n('bulkCopyEntriesNoSelection'));
+    return false;
+  }
+
+  const payload = entries
+    .map((entry) => String(entry.content ?? ''))
+    .join('\n\n');
+
+  const copied = await copyTextToClipboard(payload);
+  if (!copied) {
+    toastr.error(i18n('bulkCopyEntriesClipboardFailed'));
+    return false;
+  }
+
+  if (entries.length === 1) {
+    toastr.success(i18n('bulkCopyEntriesSingleSuccess', getEntryDisplayTitle(entries[0])));
+  } else {
+    toastr.success(i18n('bulkCopyEntriesMultiSuccess', entries.length));
+  }
+
+  return true;
+}
+
+let nativeEntryCopyObserver = null;
+let nativeEntryCopyMountTimer = null;
+
+function getEntryDisplayTitleFromForm(form) {
+  if (!(form instanceof HTMLElement)) {
+    return i18n('entryLabel');
+  }
+
+  const commentInput = form.querySelector('[name="comment"]');
+  if (commentInput && 'value' in commentInput) {
+    const comment = String(commentInput.value ?? '').trim();
+    if (comment) {
+      return comment;
+    }
+  }
+
+  const worldEntry = form.closest('.world_entry');
+  const uid = worldEntry?.getAttribute('uid') || worldEntry?.getAttribute('data-uid') || '';
+  return `${i18n('entryLabel')} #${uid}`.trim();
+}
+
+function mountNativeEntrySingleCopyButton(form) {
+  if (!(form instanceof HTMLElement)) {
+    return;
+  }
+
+  const contentRow = form.querySelector('span.alignitemscenter.flex-container.flexnowrap.wide100p.justifySpaceBetween');
+  if (!(contentRow instanceof HTMLElement)) {
+    return;
+  }
+
+  const leftGroup = contentRow.querySelector('span.alignitemscenter.flex-container')
+    || contentRow.firstElementChild;
+  if (!(leftGroup instanceof HTMLElement)) {
+    return;
+  }
+
+  let copyBtn = leftGroup.querySelector('.wis-entry-content-inline-copy-btn');
+  if (!(copyBtn instanceof HTMLButtonElement)) {
+    copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.classList.add('menu_button', 'menu_button_small', 'fa-regular', 'fa-copy', 'wis-entry-content-inline-copy-btn');
+    copyBtn.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const contentInput = form.querySelector('[name="content"]');
+      const text = (contentInput && 'value' in contentInput)
+        ? String(contentInput.value ?? '')
+        : '';
+
+      const copied = await copyTextToClipboard(text);
+      if (!copied) {
+        toastr.error(i18n('bulkCopyEntriesClipboardFailed'));
+        return;
+      }
+
+      toastr.success(i18n('bulkCopyEntriesSingleSuccess', getEntryDisplayTitleFromForm(form)));
+    });
+  }
+
+  copyBtn.title = i18n('bulkCopyEntriesSingleButtonTitle');
+  copyBtn.style.display = extension_settings.worldInfoSuite?.enableBulkEditor ? '' : 'none';
+
+  const expandBtn = leftGroup.querySelector('.editor_maximize');
+  if (expandBtn instanceof HTMLElement) {
+    if (expandBtn.nextElementSibling !== copyBtn) {
+      expandBtn.insertAdjacentElement('afterend', copyBtn);
+    }
+  } else if (copyBtn.parentElement !== leftGroup) {
+    leftGroup.append(copyBtn);
+  }
+}
+
+function updateNativeEntryCopyButtonsVisibility() {
+  const enabled = extension_settings.worldInfoSuite?.enableBulkEditor;
+  document.querySelectorAll('#world_popup_entries_list .wis-entry-content-inline-copy-btn').forEach((btn) => {
+    if (btn instanceof HTMLElement) {
+      btn.style.display = enabled ? '' : 'none';
+    }
+  });
+}
+
+function mountNativeEntryCopyButtons(root = document) {
+  if (!(root instanceof Document) && !(root instanceof HTMLElement)) {
+    return;
+  }
+
+  root.querySelectorAll('#world_popup_entries_list .world_entry form.world_entry_form').forEach((form) => {
+    mountNativeEntrySingleCopyButton(form);
+  });
+
+  updateNativeEntryCopyButtonsVisibility();
+}
+
+function scheduleNativeEntryCopyButtonsMount() {
+  if (nativeEntryCopyMountTimer) {
+    clearTimeout(nativeEntryCopyMountTimer);
+  }
+
+  nativeEntryCopyMountTimer = setTimeout(() => {
+    nativeEntryCopyMountTimer = null;
+    mountNativeEntryCopyButtons(document);
+  }, 80);
+}
+
+function initNativeEntryCopyButtons() {
+  const bindObserver = () => {
+    const entryList = document.querySelector('#world_popup_entries_list');
+    if (!(entryList instanceof HTMLElement)) {
+      return false;
+    }
+
+    if (nativeEntryCopyObserver) {
+      nativeEntryCopyObserver.disconnect();
+    }
+
+    nativeEntryCopyObserver = new MutationObserver((mutations) => {
+      const shouldMount = mutations.some((mutation) => mutation.type === 'childList' && (mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0));
+      if (shouldMount) {
+        scheduleNativeEntryCopyButtonsMount();
+      }
+    });
+
+    nativeEntryCopyObserver.observe(entryList, { childList: true, subtree: true });
+    scheduleNativeEntryCopyButtonsMount();
+    return true;
+  };
+
+  if (!bindObserver()) {
+    let retries = 0;
+    const retryTimer = setInterval(() => {
+      retries += 1;
+      if (bindObserver() || retries > 40) {
+        clearInterval(retryTimer);
+      }
+    }, 250);
+  }
+
+  eventSource.on(event_types.WORLDINFO_SETTINGS_UPDATED, () => {
+    scheduleNativeEntryCopyButtonsMount();
+  });
+
+  eventSource.on(event_types.CHAT_CHANGED, () => {
+    scheduleNativeEntryCopyButtonsMount();
+  });
+}
 
 function initBulkEditor() {
   const btn = document.createElement('div');
@@ -763,7 +1817,10 @@ function initBulkEditor() {
       return;
     }
 
-    const name = sel.selectedOptions[0].textContent;
+    const selectedIndex = Number(sel.value);
+    const name = (!Number.isNaN(selectedIndex) && Array.isArray(world_names) && world_names[selectedIndex])
+      ? world_names[selectedIndex]
+      : sel.selectedOptions[0].textContent;
     const data = await loadWorldInfo(name);
 
     // Create a template entry
@@ -946,12 +2003,14 @@ function initBulkEditor() {
     const templateHeader = document.createElement('h4');
     templateHeader.textContent = i18n('bulkEditTemplate');
     templatePanel.append(templateHeader);
+    form.querySelectorAll('.wis-entry-content-inline-copy-btn').forEach((btnElem) => btnElem.remove());
     templatePanel.append(form);
 
     contentWrapper.append(selectionPanel, templatePanel);
 
     let okToClose = false;
     let deleteTargets = false;
+    let actionMode = 'apply';
 
     const dlg = new Popup(dom, POPUP_TYPE.CONFIRM, null, {
       okButton: i18n('bulkEditApply'),
@@ -962,6 +2021,7 @@ function initBulkEditor() {
       onClosing: () => okToClose,
       customButtons: [
         { text: i18n('bulkEditMoveCopy'), classes: ['wis-bulk-move-copy'] },
+        { text: i18n('bulkEditCopyContents'), classes: ['wis-bulk-copy-contents'] },
         { text: i18n('bulkEditDelete'), classes: ['wis-bulk-delete', 'deleteworld_button'] },
       ],
     });
@@ -1097,8 +2157,20 @@ function initBulkEditor() {
         toastr.error(i18n('moveCopyError', errorCount));
       }
 
+      actionMode = 'moveCopy';
       okToClose = true;
       dlg.completeAffirmative();
+    });
+
+    // Handle Copy Entry Contents button
+    dlg.dlg.querySelector('.wis-bulk-copy-contents').addEventListener('click', async () => {
+      const selectedUids = [...entryListContainer.querySelectorAll('.wis-bulk-entry-checkbox:checked')].map((cb) => cb.value);
+      if (selectedUids.length === 0) {
+        toastr.warning(i18n('bulkCopyEntriesNoSelection'));
+        return;
+      }
+
+      await copyEntryContentsByUid(data.entries, selectedUids);
     });
 
     // Handle Delete button
@@ -1117,6 +2189,7 @@ function initBulkEditor() {
       );
 
       if (confirmResult) {
+        actionMode = 'delete';
         okToClose = true;
         deleteTargets = true;
         dlg.completeAffirmative();
@@ -1146,49 +2219,55 @@ function initBulkEditor() {
     mo.disconnect();
 
     if (outcome === POPUP_RESULT.AFFIRMATIVE) {
-      const selectedUids = [...entryListContainer.querySelectorAll('.wis-bulk-entry-checkbox:checked')].map((cb) => cb.value);
       const book = await loadWorldInfo(name);
-      const newEntry = book.entries[entry.uid];
 
-      for (const uid of selectedUids) {
-        if (deleteTargets) {
-          await deleteWorldInfoEntry(book, uid, { silent: true });
-        } else {
-          const e = book.entries[uid];
-          if (!e) continue;
-          for (const key of changeList) {
-            switch (key) {
-              case 'entryStateSelector':
-                e.constant = newEntry.constant;
-                e.vectorized = newEntry.vectorized;
-                break;
-              case 'entryKillSwitch':
-                e.disable = newEntry.disable;
-                break;
-              case 'characterFilter':
-                if (newEntry.characterFilter) {
-                  e.characterFilter = JSON.parse(JSON.stringify(newEntry.characterFilter));
-                } else {
-                  delete e.characterFilter;
-                }
-                break;
-              default:
-                if (Array.isArray(newEntry[key])) {
-                  e[key] = [...newEntry[key]];
-                } else {
-                  e[key] = newEntry[key];
-                }
-                break;
+      if (actionMode === 'moveCopy') {
+        await deleteWorldInfoEntry(book, entry.uid, { silent: true });
+        await saveWorldInfo(name, book, true);
+      } else {
+        const selectedUids = [...entryListContainer.querySelectorAll('.wis-bulk-entry-checkbox:checked')].map((cb) => cb.value);
+        const newEntry = book.entries[entry.uid];
+
+        for (const uid of selectedUids) {
+          if (deleteTargets) {
+            await deleteWorldInfoEntry(book, uid, { silent: true });
+          } else {
+            const e = book.entries[uid];
+            if (!e) continue;
+            for (const key of changeList) {
+              switch (key) {
+                case 'entryStateSelector':
+                  e.constant = newEntry.constant;
+                  e.vectorized = newEntry.vectorized;
+                  break;
+                case 'entryKillSwitch':
+                  e.disable = newEntry.disable;
+                  break;
+                case 'characterFilter':
+                  if (newEntry.characterFilter) {
+                    e.characterFilter = JSON.parse(JSON.stringify(newEntry.characterFilter));
+                  } else {
+                    delete e.characterFilter;
+                  }
+                  break;
+                default:
+                  if (Array.isArray(newEntry[key])) {
+                    e[key] = [...newEntry[key]];
+                  } else {
+                    e[key] = newEntry[key];
+                  }
+                  break;
+              }
             }
           }
         }
+
+        await deleteWorldInfoEntry(book, entry.uid, { silent: true });
+        await saveWorldInfo(name, book, true);
+
+        const action = deleteTargets ? i18n('bulkEditActionDeleted') : i18n('bulkEditActionModified');
+        toastr.success(i18n('bulkEditSuccess', action, selectedUids.length));
       }
-
-      await deleteWorldInfoEntry(book, entry.uid, { silent: true });
-      await saveWorldInfo(name, book, true);
-
-      const action = deleteTargets ? i18n('bulkEditActionDeleted') : i18n('bulkEditActionModified');
-      toastr.success(i18n('bulkEditSuccess', action, selectedUids.length));
     } else {
       // Cancelled - clean up the template entry
       const book = await loadWorldInfo(name);
@@ -1214,6 +2293,8 @@ function updateBulkEditorVisibility() {
   if (btn) {
     btn.style.display = extension_settings.worldInfoSuite?.enableBulkEditor ? '' : 'none';
   }
+
+  updateNativeEntryCopyButtonsVisibility();
 }
 
 // ============================================================
@@ -1228,6 +2309,7 @@ async function loadSettings() {
 
   // Merge with defaults for any missing keys
   extension_settings.worldInfoSuite = { ...defaultSettings, ...extension_settings.worldInfoSuite };
+  getWorldbookManagerSettings();
 
   // Load and render settings HTML
   const settingsHtml = await renderExtensionTemplateAsync(extensionName, 'settings');
@@ -1237,6 +2319,7 @@ async function loadSettings() {
   $('#wis_enable_triggered_viewer').prop('checked', extension_settings.worldInfoSuite.enableTriggeredViewer);
   $('#wis_enable_char_lorebook').prop('checked', extension_settings.worldInfoSuite.enableCharLorebook);
   $('#wis_enable_bulk_editor').prop('checked', extension_settings.worldInfoSuite.enableBulkEditor);
+  $('#wis_enable_worldbook_manager').prop('checked', extension_settings.worldInfoSuite.enableWorldbookManager);
   $('#wis_viewer_cache_limit').val(extension_settings.worldInfoSuite.viewerCacheLimit);
 
   // Bind change handlers
@@ -1270,6 +2353,12 @@ async function loadSettings() {
   $('#wis_enable_bulk_editor').on('change', function () {
     extension_settings.worldInfoSuite.enableBulkEditor = $(this).prop('checked');
     updateBulkEditorVisibility();
+    saveSettingsDebounced();
+  });
+
+  $('#wis_enable_worldbook_manager').on('change', function () {
+    extension_settings.worldInfoSuite.enableWorldbookManager = $(this).prop('checked');
+    updateWorldbookManagerVisibility();
     saveSettingsDebounced();
   });
 
@@ -1339,7 +2428,9 @@ function updateAllViewerButtonIcons(iconClass) {
   // Initialize features
   initTriggeredViewer();
   initCharLorebookQuickAccess();
+  initWorldbookManager();
   initBulkEditor();
+  initNativeEntryCopyButtons();
 
   console.log(`[${extensionName}] World Info Suite initialized`);
 })();
