@@ -464,42 +464,6 @@
    Worldbook Sort & Keyword Manager
    ============================================================ */
 
-.wis-worldbook-select2 .select2-selection--single {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.wis-worldbook-select2 .select2-selection__rendered {
-  order: 2;
-  flex: 1;
-  min-width: 0;
-}
-
-.wis-worldbook-select2 .select2-selection__arrow {
-  order: 3;
-  position: static;
-  margin-left: auto;
-}
-
-.wis-worldbook-manage-btn {
-  order: 1;
-  cursor: pointer;
-  opacity: 0.72;
-  transition: opacity 0.2s;
-  color: var(--text-color-secondary);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  font-size: 0.95em;
-}
-
-.wis-worldbook-manage-btn:hover {
-  opacity: 1;
-  color: var(--primary-color);
-}
-
 .wis-worldbook-tag-bar {
   display: flex;
   flex-wrap: wrap;

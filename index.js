@@ -1192,19 +1192,19 @@ function ensureWorldbookManagerControls() {
 
   select2Container.classList.add('wis-worldbook-select2');
 
-  const selection = select2Container.querySelector('.select2-selection--single');
-  const rendered = select2Container.querySelector('.select2-selection__rendered');
-
-  if (!(selection instanceof HTMLElement) || !(rendered instanceof HTMLElement)) {
+  const row = select2Container.parentElement;
+  if (!(row instanceof HTMLElement)) {
     return false;
   }
 
-  let manageBtn = selection.querySelector('.wis-worldbook-manage-btn');
-  if (!manageBtn) {
-    manageBtn = document.createElement('span');
-    manageBtn.classList.add('wis-worldbook-manage-btn', 'fa-solid', 'fa-arrow-down-a-z');
+  let manageBtn = row.querySelector('.wis-worldbook-manage-btn');
+  if (!(manageBtn instanceof HTMLElement)) {
+    manageBtn = document.createElement('div');
+    manageBtn.classList.add('menu_button', 'fa-solid', 'fa-arrow-down-a-z', 'interactable', 'wis-worldbook-manage-btn');
     manageBtn.setAttribute('role', 'button');
-    manageBtn.addEventListener('click', (event) => {
+    manageBtn.tabIndex = 0;
+
+    const openManager = (event) => {
       event.preventDefault();
       event.stopPropagation();
 
@@ -1214,12 +1214,22 @@ function ensureWorldbookManagerControls() {
       }
 
       showWorldbookManagerDialog();
-    });
+    };
 
-    selection.insertBefore(manageBtn, rendered);
+    manageBtn.addEventListener('click', openManager);
+    manageBtn.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        openManager(event);
+      }
+    });
+  }
+
+  if (manageBtn.parentElement !== row || manageBtn.nextElementSibling !== select2Container) {
+    row.insertBefore(manageBtn, select2Container);
   }
 
   manageBtn.title = i18n('worldManagerBtnTitle');
+  manageBtn.setAttribute('aria-label', i18n('worldManagerBtnTitle'));
   manageBtn.style.display = extension_settings.worldInfoSuite?.enableWorldbookManager ? '' : 'none';
 
   renderWorldbookQuickTagBar(select2Container);
@@ -1539,7 +1549,11 @@ function initWorldbookManager() {
     if (Date.now() < worldbookMutationSuppressedUntil) return;
 
     const select2Container = document.querySelector('#world_editor_select + .select2');
-    if (select2Container && !select2Container.querySelector('.wis-worldbook-manage-btn')) {
+    const row = select2Container?.parentElement;
+    const hasManageBtn = row instanceof HTMLElement
+      && Array.from(row.children).some((child) => child instanceof HTMLElement && child.classList.contains('wis-worldbook-manage-btn'));
+
+    if (select2Container && !hasManageBtn) {
       scheduleWorldbookManagerRefresh();
     }
   });
@@ -1653,6 +1667,8 @@ async function copyEntryContentsByUid(entriesByUid, uids) {
 
 let nativeEntryCopyObserver = null;
 let nativeEntryCopyMountTimer = null;
+const NATIVE_ENTRY_COPY_RETRY_DELAY = 45;
+const NATIVE_ENTRY_COPY_MAX_RETRY = 12;
 
 function getEntryDisplayTitleFromForm(form) {
   if (!(form instanceof HTMLElement)) {
@@ -1674,18 +1690,18 @@ function getEntryDisplayTitleFromForm(form) {
 
 function mountNativeEntrySingleCopyButton(form) {
   if (!(form instanceof HTMLElement)) {
-    return;
+    return false;
   }
 
   const contentRow = form.querySelector('span.alignitemscenter.flex-container.flexnowrap.wide100p.justifySpaceBetween');
   if (!(contentRow instanceof HTMLElement)) {
-    return;
+    return false;
   }
 
   const leftGroup = contentRow.querySelector('span.alignitemscenter.flex-container')
     || contentRow.firstElementChild;
   if (!(leftGroup instanceof HTMLElement)) {
-    return;
+    return false;
   }
 
   let copyBtn = leftGroup.querySelector('.wis-entry-content-inline-copy-btn');
@@ -1723,6 +1739,32 @@ function mountNativeEntrySingleCopyButton(form) {
   } else if (copyBtn.parentElement !== leftGroup) {
     leftGroup.append(copyBtn);
   }
+
+  return true;
+}
+
+function scheduleNativeEntryCopyMountForForm(form, attempt = 0) {
+  if (!(form instanceof HTMLElement)) {
+    return;
+  }
+
+  if (attempt === 0) {
+    if (form.dataset.wisCopyMountPending === '1') {
+      return;
+    }
+    form.dataset.wisCopyMountPending = '1';
+  }
+
+  const delayMs = attempt === 0 ? 0 : NATIVE_ENTRY_COPY_RETRY_DELAY;
+  setTimeout(() => {
+    const mounted = mountNativeEntrySingleCopyButton(form);
+    if (!mounted && attempt < NATIVE_ENTRY_COPY_MAX_RETRY) {
+      scheduleNativeEntryCopyMountForForm(form, attempt + 1);
+      return;
+    }
+
+    delete form.dataset.wisCopyMountPending;
+  }, delayMs);
 }
 
 function updateNativeEntryCopyButtonsVisibility() {
@@ -1740,7 +1782,7 @@ function mountNativeEntryCopyButtons(root = document) {
   }
 
   root.querySelectorAll('#world_popup_entries_list .world_entry form.world_entry_form').forEach((form) => {
-    mountNativeEntrySingleCopyButton(form);
+    scheduleNativeEntryCopyMountForForm(form);
   });
 
   updateNativeEntryCopyButtonsVisibility();
@@ -1754,7 +1796,7 @@ function scheduleNativeEntryCopyButtonsMount() {
   nativeEntryCopyMountTimer = setTimeout(() => {
     nativeEntryCopyMountTimer = null;
     mountNativeEntryCopyButtons(document);
-  }, 80);
+  }, 16);
 }
 
 function initNativeEntryCopyButtons() {
@@ -1776,6 +1818,26 @@ function initNativeEntryCopyButtons() {
     });
 
     nativeEntryCopyObserver.observe(entryList, { childList: true, subtree: true });
+
+    entryList.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      const toggle = target.closest('.inline-drawer-toggle');
+      if (!(toggle instanceof HTMLElement)) {
+        return;
+      }
+
+      const form = toggle.closest('form.world_entry_form');
+      if (!(form instanceof HTMLElement)) {
+        return;
+      }
+
+      scheduleNativeEntryCopyMountForForm(form);
+    }, true);
+
     scheduleNativeEntryCopyButtonsMount();
     return true;
   };
