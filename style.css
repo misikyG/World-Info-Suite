@@ -471,16 +471,30 @@
   gap: 6px;
   margin-top: 6px;
   width: 100%;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
 }
 
 .wis-worldbook-tag-label {
   font-size: 0.82em;
   color: var(--text-color-secondary);
   margin-right: 2px;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
 }
 
 .wis-worldbook-tag-chip {
-  padding: 1px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto !important;
+  min-width: max-content !important;
+  white-space: nowrap !important;
+  word-break: keep-all;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  line-height: 1.2;
+  padding: 2px 10px;
   font-size: 0.75em;
 }
 
@@ -523,7 +537,23 @@
 .wis-worldbook-sort-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0.4em;
+}
+
+.wis-worldbook-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto !important;
+  min-width: max-content !important;
+  white-space: nowrap !important;
+  word-break: keep-all;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  font-size: 0.78em !important;
+  line-height: 1.1;
+  min-height: 1.7em !important;
+  padding: 0.2em 0.65em !important;
 }
 
 .wis-worldbook-sort-btn.active {
@@ -751,13 +781,13 @@
     flex-direction: column;
     overflow-y: auto;
   }
-  
+
   .wis-bulk-selection-panel,
   .wis-bulk-template-panel {
     flex: none;
     width: 100%;
   }
-  
+
   .wis-bulk-entry-list {
     max-height: 250px;
   }
