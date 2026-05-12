@@ -1157,7 +1157,7 @@ function renderWorldbookQuickTagBar(select2Container = null) {
   const makeChip = (displayText, tagValue, isActive) => {
     const chip = document.createElement('button');
     chip.type = 'button';
-    chip.classList.add('menu_button', 'menu_button_small', 'wis-worldbook-tag-chip');
+    chip.classList.add('menu_button', 'menu_button_small', 'interactable', 'wis-worldbook-tag-chip');
     if (isActive) {
       chip.classList.add('active');
     }
@@ -1166,9 +1166,11 @@ function renderWorldbookQuickTagBar(select2Container = null) {
       event.preventDefault();
       event.stopPropagation();
       const latest = getWorldbookManagerSettings();
-      latest.activeTagFilter = tagValue;
+      const isSameTag = normalizeKeywordToken(latest.activeTagFilter) === normalizeKeywordToken(tagValue);
+      latest.activeTagFilter = isSameTag ? '' : tagValue;
       saveSettingsDebounced();
-      scheduleWorldbookManagerRefresh();
+      applyWorldbookManagerToEditorSelect();
+      renderWorldbookQuickTagBar(container);
     });
     tagBar.append(chip);
   };
