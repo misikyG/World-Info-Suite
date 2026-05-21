@@ -58,3 +58,13 @@ SillyTavern 擴充功能，提供 World Info / Lorebook 的檢視、批量處理
 - 啟用/停用各項功能
 - 調整觸發檢視器的快取保留數量
 - 清除所有快取的觸發資料
+
+## 程式碼結構
+
+- `index.js`：僅保留初始化流程與載入順序。
+- `core.js`：共用核心（擴充資訊、預設設定、i18n、設定初始化）。
+- `settings-panel.js`：設定面板渲染與所有開關事件綁定。
+- `feature-triggered-viewer.js`：功能 1（觸發條目檢視器）。
+- `feature-char-lorebook.js`：功能 2（角色世界書快速跳轉）。
+- `feature-bulk-editor.js`：功能 3（批量條目編輯 + 單條目內容複製按鈕）。
+- `feature-worldbook-manager.js`：功能 4（世界書排序 / 關鍵字 / TAG 管理）。
