@@ -19,9 +19,11 @@ import {
   saveWorldInfo,
   newWorldInfoEntryDefinition,
   moveWorldInfoEntry,
+  sortWorldInfoEntries,
 } from '../../../world-info.js';
 
 import { delay } from '../../../utils.js';
+import { remapEntryFolderUids } from './feature-entry-folders.js';
 import { i18n } from './core.js';
 
 let nativeEntryCopyObserver = null;
@@ -29,6 +31,8 @@ let nativeEntryCopyMountTimer = null;
 
 const NATIVE_ENTRY_COPY_RETRY_DELAY = 45;
 const NATIVE_ENTRY_COPY_MAX_RETRY = 12;
+const BULK_TEMPLATE_FORM_RETRY_DELAY = 100;
+const BULK_TEMPLATE_FORM_MAX_RETRY = 20;
 
 async function copyTextToClipboard(text) {
   const normalized = String(text ?? '');
@@ -74,6 +78,70 @@ function getEntryDisplayTitle(entry) {
   }
 
   return `${i18n('entryLabel')} #${entry.uid ?? ''}`.trim();
+}
+
+async function waitForBulkTemplateForm(uid) {
+  for (let attempt = 0; attempt < BULK_TEMPLATE_FORM_MAX_RETRY; attempt += 1) {
+    const form = document.querySelector(`#world_popup_entries_list .world_entry[uid="${uid}"]`);
+    if (form instanceof HTMLElement) {
+      return form;
+    }
+
+    await delay(BULK_TEMPLATE_FORM_RETRY_DELAY);
+  }
+
+  return null;
+}
+
+function formatBulkChangeValue(key, value) {
+  if (key === 'characterFilter') {
+    if (!value || typeof value !== 'object') {
+      return i18n('labelDisabled');
+    }
+
+    const names = Array.isArray(value.names) ? value.names.join(', ') : '';
+    const tags = Array.isArray(value.tags) ? value.tags.join(', ') : '';
+    const mode = value.isExclude ? i18n('labelExclude') : i18n('labelOnly');
+    return `${i18n('labelMode')}: ${mode}, ${i18n('labelCharacters')}: ${names || i18n('labelNone')}, ${i18n('labelTags')}: ${tags || i18n('labelNone')}`;
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? i18n('labelYes') : i18n('labelNo');
+  }
+
+  if (Array.isArray(value)) {
+    return value.join(', ');
+  }
+
+  if (value === null || value === '') {
+    return i18n('labelEmpty');
+  }
+
+  return String(value ?? '');
+}
+
+function createBulkEditConfirmation(changeList, templateEntry, selectedCount) {
+  const content = document.createElement('div');
+  const title = document.createElement('h3');
+  title.textContent = i18n('bulkEditConfirmTitle');
+  const description = document.createElement('p');
+  description.textContent = i18n('bulkEditConfirmMsg', selectedCount);
+  const changes = document.createElement('ul');
+
+  changeList.forEach((key) => {
+    const item = document.createElement('li');
+    const label = document.createElement('b');
+    label.textContent = `${key}: `;
+    const value = document.createElement('pre');
+    value.textContent = formatBulkChangeValue(key, templateEntry[key]);
+    item.append(label, value);
+    changes.append(item);
+  });
+
+  const warning = document.createElement('p');
+  warning.textContent = i18n('bulkEditConfirmIrreversible');
+  content.append(title, description, changes, warning);
+  return content;
 }
 
 async function copyEntryContentsByUid(entriesByUid, uids) {
@@ -298,7 +366,106 @@ function initNativeEntryCopyButtons() {
   });
 }
 
+function getSelectedWorldEditorState() {
+  const select = document.querySelector('#world_editor_select');
+  if (!(select instanceof HTMLSelectElement) || select.children[0]?.selected) {
+    return null;
+  }
+
+  const selectedIndex = Number(select.value);
+  const name = (!Number.isNaN(selectedIndex) && Array.isArray(world_names) && world_names[selectedIndex])
+    ? world_names[selectedIndex]
+    : select.selectedOptions[0]?.textContent;
+
+  const normalizedName = String(name ?? '').trim();
+  if (!normalizedName) {
+    return null;
+  }
+
+  return { select, name: normalizedName };
+}
+
 function initBulkEditor() {
+  const reindexUidButton = document.createElement('div');
+  reindexUidButton.id = 'wis-reindex-uid-btn';
+  reindexUidButton.classList.add('wis-bulk-trigger', 'menu_button', 'fa-solid', 'fa-arrow-down-1-9');
+  reindexUidButton.title = i18n('bulkReindexUidBtnTitle');
+
+  reindexUidButton.addEventListener('click', async () => {
+    if (!extension_settings.worldInfoSuite?.enableBulkEditor) {
+      toastr.warning(i18n('bulkEditDisabled'));
+      return;
+    }
+
+    const worldSelection = getSelectedWorldEditorState();
+    if (!worldSelection) {
+      toastr.warning(i18n('bulkEditNoWorldSelected'));
+      return;
+    }
+
+    const { select, name } = worldSelection;
+    const data = await loadWorldInfo(name);
+    const entries = Object.values(data?.entries || {})
+      .filter((item) => item && typeof item === 'object' && !Array.isArray(item))
+      .map((item) => {
+        const normalized = structuredClone(item);
+        normalized.displayIndex = normalized.displayIndex ?? normalized.uid;
+        return normalized;
+      });
+
+    if (entries.length === 0) {
+      toastr.warning(i18n('bulkReindexUidNoEntries'));
+      return;
+    }
+
+    const confirmResult = await Popup.show.confirm(
+      i18n('bulkReindexUidConfirmTitle'),
+      i18n('bulkReindexUidConfirmMsg', entries.length),
+      {
+        okButton: i18n('bulkReindexUidConfirmOk'),
+        cancelButton: i18n('bulkEditCancel'),
+      },
+    );
+
+    if (confirmResult !== POPUP_RESULT.AFFIRMATIVE) {
+      return;
+    }
+
+    try {
+      const sortedEntries = sortWorldInfoEntries(entries);
+      const reorderedEntries = {};
+      const uidMap = new Map();
+      let changedCount = 0;
+
+      sortedEntries.forEach((entryItem, index) => {
+        const newUid = index;
+        const newDisplayIndex = index;
+        uidMap.set(String(entryItem.uid), String(newUid));
+        if (Number(entryItem.uid) !== newUid || Number(entryItem.displayIndex) !== newDisplayIndex) {
+          changedCount += 1;
+        }
+
+        entryItem.uid = newUid;
+        entryItem.displayIndex = newDisplayIndex;
+        reorderedEntries[newUid] = entryItem;
+      });
+
+      if (changedCount === 0) {
+        toastr.info(i18n('bulkReindexUidNoChanges'));
+        return;
+      }
+
+      data.entries = reorderedEntries;
+      await saveWorldInfo(name, data, true);
+  remapEntryFolderUids(name, uidMap);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      toastr.success(i18n('bulkReindexUidSuccess', sortedEntries.length));
+    } catch (error) {
+      console.error('[WIS] Failed to reindex UIDs:', error);
+      toastr.error(i18n('bulkReindexUidError'));
+    }
+  });
+
   const button = document.createElement('div');
   button.id = 'wis-bulk-edit-btn';
   button.classList.add('wis-bulk-trigger', 'menu_button', 'fa-solid', 'fa-list-check');
@@ -310,26 +477,31 @@ function initBulkEditor() {
       return;
     }
 
-    const select = document.querySelector('#world_editor_select');
-    if (!(select instanceof HTMLSelectElement) || select.children[0]?.selected) {
+    const worldSelection = getSelectedWorldEditorState();
+    if (!worldSelection) {
       toastr.warning(i18n('bulkEditNoWorldSelected'));
       return;
     }
 
-    const selectedIndex = Number(select.value);
-    const name = (!Number.isNaN(selectedIndex) && Array.isArray(world_names) && world_names[selectedIndex])
-      ? world_names[selectedIndex]
-      : select.selectedOptions[0].textContent;
+    const { select, name } = worldSelection;
     const data = await loadWorldInfo(name);
 
     const entry = createWorldInfoEntry(null, data);
+    if (!entry) {
+      toastr.error(i18n('bulkEditTemplateLoadError'));
+      return;
+    }
+
     await saveWorldInfo(name, data, true);
     select.dispatchEvent(new Event('change', { bubbles: true }));
 
-    let form = document.querySelector(`#world_popup_entries_list .world_entry[uid="${entry.uid}"]`);
-    while (!form) {
-      await delay(100);
-      form = document.querySelector(`#world_popup_entries_list .world_entry[uid="${entry.uid}"]`);
+    const form = await waitForBulkTemplateForm(entry.uid);
+    if (!form) {
+      await deleteWorldInfoEntry(data, entry.uid, { silent: true });
+      await saveWorldInfo(name, data, true);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      toastr.error(i18n('bulkEditTemplateLoadError'));
+      return;
     }
 
     form.querySelector('.inline-drawer-toggle')?.click();
@@ -485,8 +657,9 @@ function initBulkEditor() {
       checkbox.value = entryItem.uid;
 
       const text = document.createElement('span');
-      text.textContent = `[${entryItem.uid}] ${entryItem.comment || entryItem.key.join(', ')}`;
-      text.title = `[${entryItem.uid}] ${entryItem.comment || entryItem.key.join(', ')}`;
+      const entryLabel = `[${entryItem.uid}] ${getEntryDisplayTitle(entryItem)}`;
+      text.textContent = entryLabel;
+      text.title = entryLabel;
 
       label.append(checkbox, text);
       entryListContainer.append(label);
@@ -536,41 +709,23 @@ function initBulkEditor() {
         return;
       }
 
-      let confirmationHtml = `<h3>${i18n('bulkEditConfirmTitle')}</h3><p>${i18n('bulkEditConfirmMsg', selectedUids.length)}</p><ul>`;
-
       const tempBook = await loadWorldInfo(name);
-      const templateEntry = tempBook.entries[entry.uid];
-
-      for (const key of changeList) {
-        let newValue = templateEntry[key];
-        if (key === 'characterFilter') {
-          if (newValue) {
-            const names = newValue.names.join(', ') || i18n('labelNone');
-            const tags = newValue.tags.join(', ') || i18n('labelNone');
-            const mode = newValue.isExclude ? i18n('labelExclude') : i18n('labelOnly');
-            newValue = `${i18n('labelMode')}: ${mode}, ${i18n('labelCharacters')}: ${names}, ${i18n('labelTags')}: ${tags}`;
-          } else {
-            newValue = `<i>${i18n('labelDisabled')}</i>`;
-          }
-          confirmationHtml += `<li><b>${key}</b>: <pre>${newValue}</pre></li>`;
-          continue;
-        }
-
-        if (typeof newValue === 'boolean') {
-          newValue = newValue ? i18n('labelYes') : i18n('labelNo');
-        } else if (Array.isArray(newValue)) {
-          newValue = newValue.join(', ');
-        } else if (newValue === null || newValue === '') {
-          newValue = `<i>${i18n('labelEmpty')}</i>`;
-        }
-        confirmationHtml += `<li><b>${key}</b>: <pre>${newValue}</pre></li>`;
+      const templateEntry = tempBook?.entries?.[entry.uid];
+      if (!templateEntry) {
+        toastr.error(i18n('bulkEditTemplateLoadError'));
+        return;
       }
-      confirmationHtml += `</ul><p>${i18n('bulkEditConfirmIrreversible')}</p>`;
 
-      const confirmResult = await Popup.show.confirm(i18n('bulkEditConfirmTitle'), confirmationHtml, {
+      const confirmationPopup = new Popup(
+        createBulkEditConfirmation(changeList, templateEntry, selectedUids.length),
+        POPUP_TYPE.CONFIRM,
+        null,
+        {
         okButton: i18n('bulkEditConfirmOk'),
         cancelButton: i18n('bulkEditConfirmCancel'),
-      });
+        },
+      );
+      const confirmResult = await confirmationPopup.show();
 
       if (confirmResult === POPUP_RESULT.AFFIRMATIVE) {
         okToClose = true;
@@ -770,13 +925,21 @@ function initBulkEditor() {
 
   const anchor = document.querySelector('#world_apply_current_sorting');
   if (anchor) {
-    anchor.insertAdjacentElement('afterend', button);
+    document.getElementById('wis-reindex-uid-btn')?.remove();
+    document.getElementById('wis-bulk-edit-btn')?.remove();
+    anchor.insertAdjacentElement('afterend', reindexUidButton);
+    reindexUidButton.insertAdjacentElement('afterend', button);
   }
 
   updateBulkEditorVisibility();
 }
 
 function updateBulkEditorVisibility() {
+  const reindexButton = document.getElementById('wis-reindex-uid-btn');
+  if (reindexButton) {
+    reindexButton.style.display = extension_settings.worldInfoSuite?.enableBulkEditor ? '' : 'none';
+  }
+
   const bulkButton = document.getElementById('wis-bulk-edit-btn');
   if (bulkButton) {
     bulkButton.style.display = extension_settings.worldInfoSuite?.enableBulkEditor ? '' : 'none';

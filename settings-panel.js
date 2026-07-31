@@ -25,6 +25,10 @@ import {
 } from './feature-bulk-editor.js';
 
 import {
+  updateEntryFoldersVisibility,
+} from './feature-entry-folders.js';
+
+import {
   getWorldbookManagerSettings,
   updateWorldbookManagerVisibility,
 } from './feature-worldbook-manager.js';
@@ -49,6 +53,7 @@ async function loadSettings() {
   $('#wis_enable_triggered_viewer').prop('checked', extension_settings.worldInfoSuite.enableTriggeredViewer);
   $('#wis_enable_char_lorebook').prop('checked', extension_settings.worldInfoSuite.enableCharLorebook);
   $('#wis_enable_bulk_editor').prop('checked', extension_settings.worldInfoSuite.enableBulkEditor);
+  $('#wis_enable_entry_folders').prop('checked', extension_settings.worldInfoSuite.enableEntryFolders);
   $('#wis_enable_worldbook_manager').prop('checked', extension_settings.worldInfoSuite.enableWorldbookManager);
   $('#wis_viewer_cache_limit').val(extension_settings.worldInfoSuite.viewerCacheLimit);
 
@@ -81,6 +86,12 @@ async function loadSettings() {
   $('#wis_enable_bulk_editor').on('change', function onBulkEditorToggle() {
     extension_settings.worldInfoSuite.enableBulkEditor = $(this).prop('checked');
     updateBulkEditorVisibility();
+    saveSettingsDebounced();
+  });
+
+  $('#wis_enable_entry_folders').on('change', function onEntryFoldersToggle() {
+    extension_settings.worldInfoSuite.enableEntryFolders = $(this).prop('checked');
+    updateEntryFoldersVisibility();
     saveSettingsDebounced();
   });
 

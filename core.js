@@ -1,15 +1,32 @@
 import { extension_settings } from '../../../extensions.js';
 import { addLocaleData, getCurrentLocale } from '../../../i18n.js';
 
-const url = new URL(import.meta.url);
-const extensionName = url.pathname.substring(url.pathname.lastIndexOf('extensions/') + 11, url.pathname.lastIndexOf('/'));
-const extensionFolderPath = `scripts/extensions/${extensionName}`;
+const moduleUrl = new URL(import.meta.url);
+
+function resolveExtensionName(url) {
+  const normalizedPath = String(url?.pathname ?? '').replace(/\/$/, '');
+  const extensionPathMatch = normalizedPath.match(/\/scripts\/extensions\/(.+)\/[^/]+$/);
+
+  if (extensionPathMatch?.[1]) {
+    return extensionPathMatch[1];
+  }
+
+  return normalizedPath.split('/').filter(Boolean).at(-2) || 'World-Info-Suite';
+}
+
+function getLocaleUrl(localeFile) {
+  return new URL(`./locales/${localeFile}.json`, moduleUrl);
+}
+
+const extensionName = resolveExtensionName(moduleUrl);
 
 const defaultSettings = {
   enableTriggeredViewer: true,
   enableCharLorebook: true,
   enableBulkEditor: true,
+  enableEntryFolders: true,
   enableWorldbookManager: true,
+  entryFolders: {},
   viewerCacheLimit: 10,
   viewerIcon: 'fa-globe',
   showGlobalLorebookMobile: true,
@@ -23,7 +40,7 @@ async function loadLocaleData() {
   const localeToLoad = locale.startsWith('zh') ? 'zh-tw' : 'en';
 
   try {
-    const response = await fetch(`${extensionFolderPath}/locales/${localeToLoad}.json`);
+    const response = await fetch(getLocaleUrl(localeToLoad));
     if (response.ok) {
       localeData = await response.json();
       addLocaleData(locale, localeData);
@@ -35,7 +52,7 @@ async function loadLocaleData() {
   }
 
   try {
-    const fallbackResponse = await fetch(`${extensionFolderPath}/locales/en.json`);
+    const fallbackResponse = await fetch(getLocaleUrl('en'));
     if (fallbackResponse.ok) {
       localeData = await fallbackResponse.json();
       addLocaleData('en', localeData);
@@ -68,7 +85,6 @@ function ensureSuiteSettings() {
 
 export {
   extensionName,
-  extensionFolderPath,
   defaultSettings,
   loadLocaleData,
   i18n,

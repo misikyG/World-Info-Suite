@@ -1,60 +1,97 @@
 # World Info Suite
 
-SillyTavern 擴充功能，提供 World Info / Lorebook 的檢視、批量處理、排序與關鍵字管理能力。
+[繁體中文](#繁體中文) | [English](#english)
 
-## 功能總覽
+## 繁體中文
 
-### 1) 觸發條目檢視器 (Triggered Entry Viewer)
+World Info Suite 是 SillyTavern 擴充功能，提供 World Info / Lorebook 的檢視、條目整理、批量處理、排序與關鍵字管理工具。
 
-- 在 AI 訊息上顯示檢視按鈕，點擊即可查看該回覆觸發的世界書條目。
-- 依插入位置分組顯示（角色設定前/後、作者註釋前/後、深度插入等）。
-- 顯示條目來源（全域、角色主要、角色額外、聊天）與狀態（恆定、向量、關鍵字）。
-- 可展開查看關鍵字、次要過濾、內容等明細。
+### 功能總覽
 
-快取管理：
-- 預設保留最近 10 則訊息的觸發資料。
-- 可在設定調整快取上限（0 = 無限制）。
-- 提供一鍵清除快取。
+#### 1. 觸發條目檢視器
 
-### 2) 角色世界書快速跳轉 (Character Lorebook Quick Access)
+- 在 AI 訊息上顯示檢視按鈕，查看該回覆觸發的世界書條目。
+- 依插入位置分組，並顯示條目來源與狀態。
+- 可展開查看關鍵字、次要過濾與內容等明細。
+- 預設保留最近 10 則訊息的觸發資料；可調整上限（`0` 為無限制）或一鍵清除快取。
 
-- 在角色管理區顯示角色關聯的世界書清單。
-- 區分主要、額外、聊天、全域來源。
-- 點擊可直接跳轉並開啟對應世界書。
+#### 2. 角色世界書快速跳轉
 
-### 3) 批量條目編輯器 (Bulk Entry Editor)
+- 在角色管理區顯示角色關聯的世界書。
+- 區分主要、額外、聊天與全域來源。
+- 點擊即可直接開啟對應世界書。
+
+#### 3. 批量條目編輯器
 
 - 在世界書編輯器工具列提供批量編輯按鈕。
-- 可多選條目，套用同一份修改範本。
-- 支援移動/複製選中條目到其他世界書。
-- 支援複製多筆條目的內容到剪貼簿。
-- 支援批量刪除條目，並有確認視窗避免誤操作。
+- 可多選條目並套用同一份修改範本。
+- 支援移動或複製選中條目到其他世界書、複製多筆內容，以及批量刪除確認。
+- 原生條目展開編輯區的 Content 標題列提供單條目複製按鈕。
+- 可依目前排序重整條目 UID。
 
-補充：
-- 單條目複製按鈕位於原生 ST 條目展開編輯區（Content 標題列、展開按鈕右側）。
+#### 4. 世界書條目收納
 
-### 4) 世界書排序與關鍵字管理 (Worldbook Sort & Keyword Manager)
+- 工具列的資料夾圖示按鈕位於批量編輯按鈕左側；點擊後可建立命名的可摺疊資料夾。
+- 資料夾顯示受管理條目數量，並可展開、摺疊及拖曳調整資料夾順序。
+- 可將任一世界書條目拖放到資料夾標頭收納；也可使用 `+` 按鈕批次選取條目加入。
+- 資料夾提供鉛筆按鈕以重新命名，以及垃圾桶按鈕以刪除資料夾。
+- **安全保證：資料夾只保存介面整理資訊，不會影響世界書讀取。刪除資料夾時，所有受管理條目都會回到一般列表，絕不會刪除世界書條目。**
+- 若使用「依目前排序重整條目 UID」，資料夾的條目關聯會自動更新。
 
-管理按鈕位置：
-- 位於世界書選擇器左側（Select2 顯示區），點擊開啟管理彈窗。
+#### 5. 世界書排序與關鍵字管理
 
-提供能力：
-- 簡易排序模式：
-  - 建立時間：新到舊
-  - 建立時間：舊到新
-  - 名稱排序：A 到 Z
-  - 名稱排序：Z 到 A
-  - 自定義拖拉排序
-- 自定義拖拉排序：拖拉世界書順序，僅在「自定義拖拉排序」模式生效。
-- 優先規則：輸入優先關鍵字，並可啟用「角色綁定世界書優先」。
-- 隱藏關鍵字：符合條件的世界書會在選擇器中隱藏。
-- 世界書 TAG 管理：可為每本世界書設定多個 TAG。
-- 快速 TAG 篩選列：一鍵切換 TAG 檢視；使用快速 TAG 篩選時，會暫時忽略隱藏關鍵字規則，方便快速定位。
+- 管理按鈕位於世界書選擇器左側，點擊可開啟管理彈窗。
+- 提供建立時間、名稱及自訂拖拉排序模式。
+- 可設定優先關鍵字、角色綁定世界書優先與隱藏關鍵字。
+- 支援每本世界書的多重 TAG 與快速 TAG 篩選。
 
-## 設定選項
+### 設定選項
 
-在 SillyTavern 的「擴充功能」設定面板中，可以：
+在 SillyTavern 的「擴充功能」設定面板中，可以啟用或停用各項功能、調整觸發檢視器快取上限、清除快取，以及獨立啟用或停用「世界書條目收納」。
 
-- 啟用/停用各項功能
-- 調整觸發檢視器的快取保留數量
-- 清除所有快取的觸發資料
+## English
+
+World Info Suite is a SillyTavern extension that provides World Info / Lorebook viewing, entry organization, batch operations, sorting, and keyword-management tools.
+
+### Features
+
+#### 1. Triggered Entry Viewer
+
+- Adds a viewer button to AI messages for inspecting the World Info entries triggered by that response.
+- Groups entries by insertion position and displays their source and state.
+- Lets you expand entries to inspect keywords, secondary filters, content, and other details.
+- Keeps trigger data for the latest 10 messages by default; adjust the limit (`0` is unlimited) or clear the cache in one action.
+
+#### 2. Character Lorebook Quick Access
+
+- Shows a character's associated lorebooks in the character-management area.
+- Distinguishes primary, extra, chat, and global sources.
+- Opens the selected lorebook directly.
+
+#### 3. Bulk Entry Editor
+
+- Adds a bulk-edit control to the World Info editor toolbar.
+- Select multiple entries and apply the same edit template to all of them.
+- Supports moving or copying selected entries to another worldbook, copying multiple entry contents, and confirmed bulk deletion.
+- Adds a single-entry copy control to the Content title row in the expanded native entry editor.
+- Can reindex entry UIDs according to the current sort order.
+
+#### 4. Worldbook Entry Folders
+
+- Use the folder icon to the left of the bulk-edit button to create a named, collapsible folder.
+- Folders show their managed entry count and can be expanded, collapsed, or dragged to change folder order.
+- Drag any worldbook entry onto a folder header to organize it, or use the `+` button to add multiple selected entries.
+- Use the pencil button to rename a folder and the trash button to remove it.
+- **Safety guarantee: folders store interface-only organization data and never affect worldbook reading. Removing a folder returns all of its managed entries to the regular list; it never deletes World Info entries.**
+- Folder membership is updated automatically after reindexing entry UIDs by the current sort order.
+
+#### 5. Worldbook Sort & Keyword Manager
+
+- Opens from the control to the left of the World Info selector.
+- Provides creation-time, name, and custom drag-order sorting modes.
+- Supports priority keywords, character-bound worldbook priority, and hidden keywords.
+- Supports multiple TAGs per worldbook and quick TAG filtering.
+
+### Settings
+
+In SillyTavern's Extensions settings panel, you can enable or disable each feature, adjust the Triggered Entry Viewer cache limit, clear cached trigger data, and independently enable or disable Worldbook Entry Folders.

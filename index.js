@@ -24,6 +24,10 @@ import {
   initNativeEntryCopyButtons,
 } from './feature-bulk-editor.js';
 
+import {
+  initEntryFolders,
+} from './feature-entry-folders.js';
+
 (async function init() {
   await loadLocaleData();
   await loadSettings();
@@ -32,6 +36,7 @@ import {
   initCharLorebookQuickAccess();
   initWorldbookManager();
   initBulkEditor();
+  initEntryFolders();
   initNativeEntryCopyButtons();
 
   console.log(`[${extensionName}] World Info Suite initialized`);

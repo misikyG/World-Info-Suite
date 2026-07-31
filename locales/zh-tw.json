@@ -1,19 +1,21 @@
 {
     "extensionName": "世界書工具包",
     "extensionDescription": "增強世界書管理功能",
-    
+
     "featureTriggeredEntryViewer": "觸發條目檢視器",
     "featureTriggeredEntryViewerDesc": "檢視每則 AI 回覆觸發了哪些世界書條目",
     "featureCharacterLorebookQuickAccess": "世界書快速跳轉",
     "featureCharacterLorebookQuickAccessDesc": "快速存取面板，可檢視並跳轉至綁定的世界書",
     "featureBulkEditor": "批量條目編輯器",
     "featureBulkEditorDesc": "一次批量編輯多個世界書條目",
+    "featureEntryFolders": "世界書條目收納",
+    "featureEntryFoldersDesc": "用可摺疊資料夾整理條目，不會影響世界書讀取",
     "featureWorldbookManager": "世界書排序與關鍵字管理",
     "featureWorldbookManagerDesc": "排序世界書並管理關鍵字優先與篩選規則",
 
     "settingsTitle": "世界書工具包設定",
     "settingsEnableFeatures": "啟用/停用功能",
-    
+
     "positionBeforeCharDef": "角色設定前",
     "positionAfterCharDef": "角色設定後",
     "positionBeforeAN": "作者註釋前",
@@ -96,9 +98,18 @@
     "bulkCopyEntriesMultiSuccess": "已複製 {0} 則條目內容到剪貼簿。",
     "bulkCopyEntriesClipboardFailed": "無法寫入剪貼簿，請確認瀏覽器權限。",
     "bulkCopyEntriesSingleButtonTitle": "複製此條目內容",
-    
+    "bulkReindexUidBtnTitle": "依當前排序重整 UID",
+    "bulkReindexUidNoEntries": "此世界書沒有可重整的條目。",
+    "bulkReindexUidConfirmTitle": "重整 UID",
+    "bulkReindexUidConfirmMsg": "將依照當前排序，重新編號這本書的 {0} 個條目 UID。此操作會改變所有 UID，確定要繼續嗎？",
+    "bulkReindexUidConfirmOk": "重整",
+    "bulkReindexUidNoChanges": "目前 UID 已符合當前排序，無需重整。",
+    "bulkReindexUidSuccess": "已依當前排序重整 {0} 個條目的 UID。",
+    "bulkReindexUidError": "重整 UID 失敗，請查看主控台訊息。",
+
     "bulkEditNoEntriesSelected": "沒有選擇任何要修改的條目。",
     "bulkEditNoChanges": "沒有對範本進行任何修改。",
+    "bulkEditTemplateLoadError": "無法準備批量編輯範本，請重新開啟世界書後再試一次。",
     "bulkEditConfirmTitle": "確認修改",
     "bulkEditConfirmMsg": "您將對 {0} 個條目進行以下修改：",
     "bulkEditConfirmIrreversible": "此操作無法復原，確定要繼續嗎？",
@@ -162,7 +173,7 @@
     "labelCharacters": "角色",
     "labelTags": "標籤",
     "labelNone": "無",
-    
+
     "labelDepth": "深度：",
     "labelStatus": "狀態：",
     "labelPrimaryKeys": "主關鍵字",
@@ -171,6 +182,23 @@
     "labelContent": "內容：",
 
     "entryLabel": "條目",
+    "entryFolderCreateButton": "建立摺疊資料夾",
+    "entryFolderCreateTitle": "建立摺疊資料夾",
+    "entryFolderCreatePrompt": "請輸入資料夾名稱：",
+    "entryFolderSummary": "{0} 個條目",
+    "entryFolderExpand": "展開資料夾",
+    "entryFolderCollapse": "摺疊資料夾",
+    "entryFolderAddEntries": "加入條目",
+    "entryFolderAddEntriesTitle": "加入條目至「{0}」",
+    "entryFolderAddEntriesConfirm": "加入選取條目",
+    "entryFolderRename": "編輯資料夾名稱",
+    "entryFolderRenameTitle": "編輯資料夾名稱",
+    "entryFolderRenamePrompt": "請輸入新的資料夾名稱：",
+    "entryFolderDelete": "刪除資料夾",
+    "entryFolderDeleteTitle": "刪除資料夾",
+    "entryFolderDeleteMessage": "確定要刪除「{0}」嗎？其中的 {1} 個世界書條目不會被刪除，會回到一般列表。",
+    "entryFolderNoEntries": "此世界書沒有可加入的條目。",
+    "entryFolderDisabled": "世界書條目收納功能已停用。",
 
     "showGlobalLorebookMobile": "手機版顯示全域綁定",
     "showGlobalLorebookDesktop": "電腦版顯示全域綁定",

@@ -5,6 +5,7 @@ import {
   chat_metadata,
   characters,
   this_chid,
+  saveChatDebounced,
 } from '../../../../script.js';
 
 import {
@@ -407,6 +408,7 @@ function cleanupViewerCache() {
         delete chat[index].extra.worldInfoViewer;
       }
     }
+    saveChatDebounced();
   }
 }
 
@@ -422,6 +424,10 @@ function clearAllViewerCache() {
   }
 
   document.querySelectorAll('.worldinfo-viewer-btn').forEach((button) => button.remove());
+
+  if (count > 0) {
+    saveChatDebounced();
+  }
 
   return count;
 }

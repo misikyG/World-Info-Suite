@@ -1,19 +1,21 @@
 {
     "extensionName": "World Info Suite",
     "extensionDescription": "Enhanced World Info management tools",
-    
+
     "featureTriggeredEntryViewer": "Triggered Entry Viewer",
     "featureTriggeredEntryViewerDesc": "View which World Info entries were triggered for each AI response",
     "featureCharacterLorebookQuickAccess": "Lorebook Quick Access",
     "featureCharacterLorebookQuickAccessDesc": "Quick access panel to view and jump to bound lorebooks",
     "featureBulkEditor": "Bulk Entry Editor",
     "featureBulkEditorDesc": "Batch edit multiple World Info entries at once",
+    "featureEntryFolders": "Worldbook Entry Folders",
+    "featureEntryFoldersDesc": "Organize entries in collapsible folders without affecting worldbook reading",
     "featureWorldbookManager": "Worldbook Sort & Keyword Manager",
     "featureWorldbookManagerDesc": "Sort worldbooks and manage keyword-based priority/filtering",
 
     "settingsTitle": "World Info Suite Settings",
     "settingsEnableFeatures": "Enable/Disable Features",
-    
+
     "positionBeforeCharDef": "Before Char Defs",
     "positionAfterCharDef": "After Char Defs",
     "positionBeforeAN": "Before AN",
@@ -96,9 +98,18 @@
     "bulkCopyEntriesMultiSuccess": "Copied content from {0} entries to clipboard.",
     "bulkCopyEntriesClipboardFailed": "Unable to copy to clipboard. Check browser permissions.",
     "bulkCopyEntriesSingleButtonTitle": "Copy this entry content",
-    
+    "bulkReindexUidBtnTitle": "Reindex UIDs by current sort",
+    "bulkReindexUidNoEntries": "This worldbook has no entries to reindex.",
+    "bulkReindexUidConfirmTitle": "Reindex UIDs",
+    "bulkReindexUidConfirmMsg": "This will renumber UIDs for {0} entries in this book based on the current sort order. This changes all UIDs. Continue?",
+    "bulkReindexUidConfirmOk": "Reindex",
+    "bulkReindexUidNoChanges": "UIDs already match the current sort order. No changes made.",
+    "bulkReindexUidSuccess": "Reindexed UIDs for {0} entries based on current sort order.",
+    "bulkReindexUidError": "Failed to reindex UIDs. Check console for details.",
+
     "bulkEditNoEntriesSelected": "No entries selected to modify.",
     "bulkEditNoChanges": "No changes made to the template.",
+    "bulkEditTemplateLoadError": "Unable to prepare the bulk-edit template. Please reopen the worldbook and try again.",
     "bulkEditConfirmTitle": "Confirm Changes",
     "bulkEditConfirmMsg": "You will apply the following changes to {0} entries:",
     "bulkEditConfirmIrreversible": "This action cannot be undone. Are you sure you want to continue?",
@@ -162,7 +173,7 @@
     "labelCharacters": "Characters",
     "labelTags": "Tags",
     "labelNone": "None",
-    
+
     "labelDepth": "Depth:",
     "labelStatus": "Status:",
     "labelPrimaryKeys": "Primary Keys",
@@ -171,6 +182,23 @@
     "labelContent": "Content:",
 
     "entryLabel": "Entry",
+    "entryFolderCreateButton": "Create collapsible folder",
+    "entryFolderCreateTitle": "Create collapsible folder",
+    "entryFolderCreatePrompt": "Enter a folder name:",
+    "entryFolderSummary": "{0} entries",
+    "entryFolderExpand": "Expand folder",
+    "entryFolderCollapse": "Collapse folder",
+    "entryFolderAddEntries": "Add entries",
+    "entryFolderAddEntriesTitle": "Add entries to \"{0}\"",
+    "entryFolderAddEntriesConfirm": "Add selected entries",
+    "entryFolderRename": "Rename folder",
+    "entryFolderRenameTitle": "Rename folder",
+    "entryFolderRenamePrompt": "Enter a new folder name:",
+    "entryFolderDelete": "Delete folder",
+    "entryFolderDeleteTitle": "Delete folder",
+    "entryFolderDeleteMessage": "Delete \"{0}\"? Its {1} worldbook entries will not be deleted and will return to the regular list.",
+    "entryFolderNoEntries": "This worldbook has no entries to add.",
+    "entryFolderDisabled": "Worldbook entry folders are disabled.",
 
     "showGlobalLorebookMobile": "Show global lorebooks on mobile",
     "showGlobalLorebookDesktop": "Show global lorebooks on desktop",
