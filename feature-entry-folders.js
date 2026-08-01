@@ -11,6 +11,7 @@ import {
 import {
   world_names,
   loadWorldInfo,
+  sortWorldInfoEntries,
 } from '../../../world-info.js';
 
 import { i18n } from './core.js';
@@ -18,6 +19,7 @@ import { i18n } from './core.js';
 let entryListObserver = null;
 let renderTimer = null;
 let isRendering = false;
+let activeEntryFolderDrag = null;
 
 const DOM_MOUNT_RETRY_DELAY = 250;
 const DOM_MOUNT_MAX_RETRY = 40;
@@ -108,6 +110,18 @@ function getDataEntryTitle(entry) {
   return `${i18n('entryLabel')} #${entry?.uid ?? ''}`;
 }
 
+async function getSortedEntryUids(worldName) {
+  const data = await loadWorldInfo(worldName);
+  const entries = Object.values(data?.entries || {})
+    .filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry))
+    .map((entry) => ({
+      ...entry,
+      displayIndex: entry.displayIndex ?? entry.uid,
+    }));
+
+  return new Map(sortWorldInfoEntries(entries).map((entry, index) => [String(entry.uid), index]));
+}
+
 function normalizeFolders(worldName, availableUids) {
   const seen = new Set();
   const folders = getFolders(worldName);
@@ -156,6 +170,22 @@ function assignEntryToFolder(worldName, folderId, uid) {
   targetFolder.uids.push(uid);
   saveFolders();
   scheduleFolderRender();
+}
+
+function releaseEntryFromFolders(worldName, uid) {
+  let changed = false;
+  getFolders(worldName).forEach((folder) => {
+    const remainingUids = (folder.uids || []).map(String).filter((entryUid) => entryUid !== uid);
+    if (remainingUids.length !== (folder.uids || []).length) {
+      folder.uids = remainingUids;
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    saveFolders();
+    scheduleFolderRender();
+  }
 }
 
 function createTrashIcon() {
@@ -403,32 +433,83 @@ function createFolderHeader(worldName, folder, entryCount) {
   return header;
 }
 
-function makeEntryDraggable(entry) {
-  entry.draggable = false;
+function clearEntryFolderDrag() {
+  document.querySelectorAll('.wis-entry-folder-drag-over').forEach((folder) => {
+    folder.classList.remove('wis-entry-folder-drag-over');
+  });
+  document.querySelector('#world_popup_entries_list')?.classList.remove('wis-entry-folder-release-zone');
+  document.body.classList.remove('wis-entry-folder-entry-dragging');
+  activeEntryFolderDrag = null;
+}
+
+function getFolderAtPoint(clientX, clientY) {
+  return [...document.querySelectorAll('.wis-entry-folder')].find((folder) => {
+    const bounds = folder.getBoundingClientRect();
+    return clientX >= bounds.left
+      && clientX <= bounds.right
+      && clientY >= bounds.top
+      && clientY <= bounds.bottom;
+  }) ?? null;
+}
+
+function isPointInEntryList(clientX, clientY) {
+  const entryList = document.querySelector('#world_popup_entries_list');
+  if (!(entryList instanceof HTMLElement)) {
+    return false;
+  }
+
+  const bounds = entryList.getBoundingClientRect();
+  return clientX >= bounds.left
+    && clientX <= bounds.right
+    && clientY >= bounds.top
+    && clientY <= bounds.bottom;
+}
+
+function getEntryAtPoint(clientX, clientY) {
+  const elements = typeof document.elementsFromPoint === 'function'
+    ? document.elementsFromPoint(clientX, clientY)
+    : [document.elementFromPoint(clientX, clientY)].filter(Boolean);
+
+  return elements
+    .filter((element) => !element.classList.contains('ui-sortable-helper'))
+    .map((element) => element.closest('#world_popup_entries_list > .world_entry'))
+    .find(Boolean) ?? null;
+}
+
+function bindEntryFolderDragHandle(entry) {
   const dragHandle = entry.querySelector('.drag-handle');
   if (!(dragHandle instanceof HTMLElement)) {
     return;
   }
 
-  dragHandle.draggable = true;
   if (dragHandle.dataset.wisFolderDraggable === '1') {
     return;
   }
 
   dragHandle.dataset.wisFolderDraggable = '1';
-  dragHandle.addEventListener('dragstart', (event) => {
-    const uid = getEntryUid(entry);
-    if (!uid || !event.dataTransfer) {
+  dragHandle.addEventListener('mousedown', (event) => {
+    if (event.button !== 0 || !extension_settings.worldInfoSuite?.enableEntryFolders) {
       return;
     }
 
-    event.dataTransfer.setData('application/x-wis-entry-uid', uid);
-    event.dataTransfer.setData('text/plain', uid);
-    event.dataTransfer.effectAllowed = 'move';
+    const uid = getEntryUid(entry);
+    const worldSelection = getSelectedWorldEditorState();
+    if (!uid || !worldSelection) {
+      return;
+    }
+
+    activeEntryFolderDrag = {
+      uid,
+      worldName: worldSelection.name,
+      folderId: entry.dataset.wisFolderId || null,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+    };
   });
 }
 
-function renderFolders() {
+async function renderFolders() {
   renderTimer = null;
   const entryList = document.querySelector('#world_popup_entries_list');
   const worldSelection = getSelectedWorldEditorState();
@@ -444,16 +525,20 @@ function renderFolders() {
     entry.classList.remove('wis-entry-folder-member', 'wis-entry-folder-collapsed');
     entry.removeAttribute('data-wis-folder-id');
     entry.draggable = false;
-    const dragHandle = entry.querySelector('.drag-handle');
-    if (dragHandle instanceof HTMLElement) {
-      dragHandle.draggable = false;
-    }
   });
 
   if (!extension_settings.worldInfoSuite?.enableEntryFolders || !worldSelection) {
     isRendering = false;
     entryListObserver?.observe(entryList, { childList: true });
     return;
+  }
+
+  let sortedEntryUids;
+  try {
+    sortedEntryUids = await getSortedEntryUids(worldSelection.name);
+  } catch (error) {
+    console.warn('[World Info Suite] Failed to sort entry folders:', error);
+    sortedEntryUids = new Map(entries.map((entry, index) => [getEntryUid(entry), index]));
   }
 
   const entriesByUid = new Map(entries.map((entry) => [getEntryUid(entry), entry]).filter(([uid]) => uid));
@@ -467,20 +552,22 @@ function renderFolders() {
   folders.forEach((folder) => {
     const folderEntries = (folder.uids || []).map(String)
       .map((uid) => entriesByUid.get(uid))
-      .filter(Boolean);
+      .filter(Boolean)
+      .sort((first, second) => (sortedEntryUids.get(getEntryUid(first)) ?? Infinity)
+        - (sortedEntryUids.get(getEntryUid(second)) ?? Infinity));
     fragment.append(createFolderHeader(worldSelection.name, folder, folderEntries.length));
     folderEntries.forEach((entry) => {
       assignedUids.add(getEntryUid(entry));
       entry.classList.add('wis-entry-folder-member');
       entry.dataset.wisFolderId = folder.id;
       entry.classList.toggle('wis-entry-folder-collapsed', folder.collapsed);
-      makeEntryDraggable(entry);
+      bindEntryFolderDragHandle(entry);
       fragment.append(entry);
     });
   });
 
   entries.filter((entry) => !assignedUids.has(getEntryUid(entry))).forEach((entry) => {
-    makeEntryDraggable(entry);
+    bindEntryFolderDragHandle(entry);
     fragment.append(entry);
   });
   entryList.append(fragment);
@@ -489,11 +576,17 @@ function renderFolders() {
 }
 
 function scheduleFolderRender() {
+  if (activeEntryFolderDrag?.moved) {
+    return;
+  }
+
   if (renderTimer) {
     clearTimeout(renderTimer);
   }
 
-  renderTimer = setTimeout(renderFolders, 20);
+  renderTimer = setTimeout(() => {
+    void renderFolders();
+  }, 20);
 }
 
 async function createFolder() {
@@ -531,6 +624,53 @@ function initEntryFolders() {
   button.setAttribute('aria-label', i18n('entryFolderCreateButton'));
   button.append(createFolderIcon());
   button.addEventListener('click', createFolder);
+
+  document.addEventListener('mousemove', (event) => {
+    if (!activeEntryFolderDrag) {
+      return;
+    }
+
+    const hasMoved = Math.abs(event.clientX - activeEntryFolderDrag.startX) > 4
+      || Math.abs(event.clientY - activeEntryFolderDrag.startY) > 4;
+    if (!hasMoved) {
+      return;
+    }
+
+    activeEntryFolderDrag.moved = true;
+    document.body.classList.add('wis-entry-folder-entry-dragging');
+    const targetFolder = getFolderAtPoint(event.clientX, event.clientY);
+    const releaseZone = Boolean(activeEntryFolderDrag.folderId)
+      && !targetFolder
+      && !getEntryAtPoint(event.clientX, event.clientY)
+      && isPointInEntryList(event.clientX, event.clientY);
+    document.querySelector('#world_popup_entries_list')?.classList.toggle('wis-entry-folder-release-zone', releaseZone);
+    document.querySelectorAll('.wis-entry-folder-drag-over').forEach((folder) => {
+      folder.classList.toggle('wis-entry-folder-drag-over', folder === targetFolder);
+    });
+    targetFolder?.classList.add('wis-entry-folder-drag-over');
+  }, true);
+
+  document.addEventListener('mouseup', (event) => {
+    if (!activeEntryFolderDrag) {
+      return;
+    }
+
+    const drag = activeEntryFolderDrag;
+    const targetFolder = drag.moved ? getFolderAtPoint(event.clientX, event.clientY) : null;
+    const shouldRelease = drag.moved
+      && !targetFolder
+      && !getEntryAtPoint(event.clientX, event.clientY)
+      && isPointInEntryList(event.clientX, event.clientY);
+    clearEntryFolderDrag();
+    const folderId = targetFolder?.dataset.folderId;
+    if (folderId) {
+      assignEntryToFolder(drag.worldName, folderId, drag.uid);
+    } else if (shouldRelease) {
+      releaseEntryFromFolders(drag.worldName, drag.uid);
+    } else if (drag.moved) {
+      setTimeout(scheduleFolderRender, 0);
+    }
+  }, true);
 
   const mount = () => {
     const bulkButton = document.getElementById('wis-bulk-edit-btn');

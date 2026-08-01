@@ -59,6 +59,11 @@
 }
 
 /* ===== Worldbook Entry Folders ===== */
+:root {
+  --wis-entry-folder-drop-color: var(--SmartThemeQuoteColor, var(--primary-color, #4c9aff));
+  --wis-entry-folder-drop-background: var(--SmartThemeUserMesBlurTintColor, rgba(76, 154, 255, 0.18));
+}
+
 .wis-entry-folder {
   align-items: center;
   background: var(--background-color-secondary);
@@ -77,8 +82,18 @@
 }
 
 .wis-entry-folder-drag-over {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 1px var(--primary-color);
+  background: var(--wis-entry-folder-drop-background) !important;
+  border-color: var(--wis-entry-folder-drop-color) !important;
+  box-shadow: 0 0 0 2px var(--wis-entry-folder-drop-color) !important;
+}
+
+#world_popup_entries_list.wis-entry-folder-release-zone {
+  outline: 2px dashed var(--wis-entry-folder-drop-color);
+  outline-offset: -2px;
+}
+
+.wis-entry-folder-entry-dragging .drag-handle {
+  cursor: grabbing;
 }
 
 .wis-entry-folder-drag-handle {
