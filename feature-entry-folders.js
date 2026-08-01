@@ -404,13 +404,19 @@ function createFolderHeader(worldName, folder, entryCount) {
 }
 
 function makeEntryDraggable(entry) {
-  entry.draggable = true;
-  if (entry.dataset.wisFolderDraggable === '1') {
+  entry.draggable = false;
+  const dragHandle = entry.querySelector('.drag-handle');
+  if (!(dragHandle instanceof HTMLElement)) {
     return;
   }
 
-  entry.dataset.wisFolderDraggable = '1';
-  entry.addEventListener('dragstart', (event) => {
+  dragHandle.draggable = true;
+  if (dragHandle.dataset.wisFolderDraggable === '1') {
+    return;
+  }
+
+  dragHandle.dataset.wisFolderDraggable = '1';
+  dragHandle.addEventListener('dragstart', (event) => {
     const uid = getEntryUid(entry);
     if (!uid || !event.dataTransfer) {
       return;
@@ -438,6 +444,10 @@ function renderFolders() {
     entry.classList.remove('wis-entry-folder-member', 'wis-entry-folder-collapsed');
     entry.removeAttribute('data-wis-folder-id');
     entry.draggable = false;
+    const dragHandle = entry.querySelector('.drag-handle');
+    if (dragHandle instanceof HTMLElement) {
+      dragHandle.draggable = false;
+    }
   });
 
   if (!extension_settings.worldInfoSuite?.enableEntryFolders || !worldSelection) {
