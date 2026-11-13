@@ -2,11 +2,16 @@
   <h3 data-i18n="popupTitle">{{i18n.popupTitle}}</h3>
 
   {{#if positions.length}}
+  <div class="wi-viewer-layout">
+  <div class="wi-nav"><div class="wi-nav-dots"></div></div>
+  <div class="wi-viewer-main">
   {{#each positions}}
   <div class="wi-position-group">
-    <h4 class="wi-position-header">
+    <h4 class="wi-position-header" role="button" tabindex="0" aria-expanded="true" title="{{@root.i18n.popupToggleSection}}">
+      <span class="wi-collapse-icon fa-solid fa-chevron-down"></span>
       <span class="wi-emoji">{{this.positionEmoji}}</span>
       <span class="wi-position-name">{{this.positionName}}</span>
+      <span class="wi-position-count">{{this.entries.length}}</span>
     </h4>
 
     <div class="wi-entries-container">
@@ -78,6 +83,8 @@
   </div>
 </div>
 {{/each}}
+  </div>
+  </div>
 {{else}}
 <div class="wi-no-entries">
   <p data-i18n="popupNoEntries">{{i18n.popupNoEntries}}</p>

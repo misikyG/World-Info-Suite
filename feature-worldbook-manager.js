@@ -39,6 +39,7 @@ let worldbookUiObserver = null;
 let worldbookPlaceholderOption;
 let isApplyingWorldbookOptions = false;
 let worldbookMutationSuppressedUntil = 0;
+let lastSelectedWorldName = '';
 
 function createWorldbookManagerDefaults() {
   return {
@@ -184,6 +185,25 @@ function worldbookHasTag(worldName, tag, settings = getWorldbookManagerSettings(
   return getWorldbookTags(worldName, settings).some((tagName) => normalizeKeywordToken(tagName) === needle);
 }
 
+// Hidden keywords only match the worldbook name, never its TAGs.
+function worldbookIsHiddenByKeyword(worldName, settings = getWorldbookManagerSettings()) {
+  const nameToken = normalizeKeywordToken(worldName);
+  return settings.hiddenKeywords.some((keyword) => {
+    const needle = normalizeKeywordToken(keyword);
+    return needle !== '' && nameToken.includes(needle);
+  });
+}
+
+// With an active TAG filter only the TAG decides (hidden books carrying it stay reachable);
+// without one ("All"), books hidden by keyword are removed first.
+function isWorldbookVisible(worldName, settings = getWorldbookManagerSettings()) {
+  if (normalizeKeywordToken(settings.activeTagFilter) !== '') {
+    return worldbookHasTag(worldName, settings.activeTagFilter, settings);
+  }
+
+  return !worldbookIsHiddenByKeyword(worldName, settings);
+}
+
 function getCharacterBoundWorldbookSet() {
   const bound = new Set();
 
@@ -280,7 +300,22 @@ function getCurrentWorldEditorSelectionName() {
   return '';
 }
 
-function rebuildWorldEditorOptions(orderedNames, selectedName) {
+// ST rebuilds the options by text comparison, which drops the selection of a book shown with the
+// "hidden" suffix. The last selection reported by change events is used to restore it.
+function resolveEditorSelection() {
+  const currentName = getCurrentWorldEditorSelectionName();
+  if (currentName) {
+    return { name: currentName, restored: false };
+  }
+
+  if (lastSelectedWorldName && Array.isArray(world_names) && world_names.includes(lastSelectedWorldName)) {
+    return { name: lastSelectedWorldName, restored: true };
+  }
+
+  return { name: '', restored: false };
+}
+
+function rebuildWorldEditorOptions(orderedNames, selectedName, restored = false) {
   const select = document.querySelector('#world_editor_select');
   if (!(select instanceof HTMLSelectElement) || !Array.isArray(world_names)) return;
 
@@ -325,6 +360,8 @@ function rebuildWorldEditorOptions(orderedNames, selectedName) {
   isApplyingWorldbookOptions = true;
   select.replaceChildren(fragment);
   isApplyingWorldbookOptions = false;
+  // Drop our own mutation records so later rebuilds by ST are never mistaken for them.
+  worldbookSelectObserver?.takeRecords();
 
   if (selectedName && worldIndexMap.has(selectedName)) {
     const selectedValue = String(worldIndexMap.get(selectedName));
@@ -337,7 +374,8 @@ function rebuildWorldEditorOptions(orderedNames, selectedName) {
     select.value = '';
   }
 
-  if (select.value !== previousValue) {
+  // A restored selection is still loaded in the editor, so no reload is needed.
+  if (select.value !== previousValue && !restored) {
     select.dispatchEvent(new Event('change', { bubbles: true }));
   } else {
     $(select).trigger('change.select2');
@@ -350,33 +388,19 @@ function applyWorldbookManagerToEditorSelect() {
     return;
   }
 
-  const selectedName = getCurrentWorldEditorSelectionName();
+  const { name: selectedName, restored } = resolveEditorSelection();
 
   if (!extension_settings.worldInfoSuite?.enableWorldbookManager) {
-    rebuildWorldEditorOptions([...world_names], selectedName);
+    rebuildWorldEditorOptions([...world_names], selectedName, restored);
     return;
   }
 
   const settings = getWorldbookManagerSettings();
   const sortedNames = sortWorldbookNamesForManager(world_names, settings);
-  const hasActiveTagFilter = normalizeKeywordToken(settings.activeTagFilter) !== '';
+  const visibleNames = sortedNames.filter((name) => isWorldbookVisible(name, settings));
 
-  const visibleNames = sortedNames.filter((name) => {
-    if (name === selectedName) return true;
-
-    if (!hasActiveTagFilter) {
-      const hiddenByKeyword = settings.hiddenKeywords.some((keyword) => worldbookMatchesKeyword(name, keyword, settings));
-      if (hiddenByKeyword) return false;
-    }
-
-    if (hasActiveTagFilter && !worldbookHasTag(name, settings.activeTagFilter, settings)) {
-      return false;
-    }
-
-    return true;
-  });
-
-  rebuildWorldEditorOptions(visibleNames, selectedName);
+  // A filtered-out selected book is re-added with a "hidden" suffix by rebuildWorldEditorOptions.
+  rebuildWorldEditorOptions(visibleNames, selectedName, restored);
 }
 
 function ensureWorldbookVisibleForQuickJump(worldName) {
@@ -825,11 +849,16 @@ function initWorldbookManager() {
 
     worldbookSelectObserver = new MutationObserver(() => {
       if (isApplyingWorldbookOptions) return;
-      if (Date.now() < worldbookMutationSuppressedUntil) return;
       scheduleWorldbookManagerRefresh();
     });
 
     worldbookSelectObserver.observe(select, { childList: true });
+
+    // jQuery handler so that $(select).trigger('change') calls made by ST are tracked too.
+    $(select).off('change.wisWorldbook').on('change.wisWorldbook', () => {
+      lastSelectedWorldName = getCurrentWorldEditorSelectionName();
+    });
+    lastSelectedWorldName = getCurrentWorldEditorSelectionName();
   };
 
   const trySetup = () => {

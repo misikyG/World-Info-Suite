@@ -361,6 +361,82 @@ function addViewButtonToMessage(messageId) {
   extraButtonsContainer.prepend(button);
 }
 
+function setupViewerInteractions(root) {
+  const groups = [...root.querySelectorAll('.wi-position-group')];
+  const dotsHost = root.querySelector('.wi-nav-dots');
+  const nav = root.querySelector('.wi-nav');
+  if (!groups.length || !(dotsHost instanceof HTMLElement) || !(nav instanceof HTMLElement)) return;
+
+  const toggleGroup = (group) => {
+    const collapsed = group.classList.toggle('collapsed');
+    group.querySelector('.wi-position-header')?.setAttribute('aria-expanded', String(!collapsed));
+  };
+
+  root.addEventListener('click', (event) => {
+    const header = event.target instanceof Element ? event.target.closest('.wi-position-header') : null;
+    if (header) toggleGroup(header.closest('.wi-position-group'));
+  });
+
+  root.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const header = event.target instanceof Element ? event.target.closest('.wi-position-header') : null;
+    if (!header || event.target !== header) return;
+    event.preventDefault();
+    toggleGroup(header.closest('.wi-position-group'));
+  });
+
+  // A single section needs no navigation.
+  if (groups.length < 2) {
+    nav.style.display = 'none';
+    return;
+  }
+
+  const dots = groups.map((group) => {
+    const label = [
+      group.querySelector('.wi-emoji')?.textContent,
+      group.querySelector('.wi-position-name')?.textContent,
+    ].map((text) => (text || '').trim()).filter(Boolean).join(' ');
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.classList.add('wi-nav-dot');
+    dot.title = label;
+    dot.setAttribute('aria-label', label);
+    dot.addEventListener('click', () => {
+      group.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    dotsHost.append(dot);
+    return dot;
+  });
+
+  const setActive = (index) => dots.forEach((dot, i) => dot.classList.toggle('active', i === index));
+  setActive(0);
+
+  // The scroll container only exists once the popup has been attached to the document.
+  let attempts = 0;
+  const bindScroll = () => {
+    const scroller = root.closest('.popup-content');
+    if (!(scroller instanceof HTMLElement)) {
+      attempts += 1;
+      if (attempts < 40) setTimeout(bindScroll, 50);
+      return;
+    }
+
+    const update = () => {
+      const top = scroller.getBoundingClientRect().top;
+      const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
+      let active = 0;
+      groups.forEach((group, index) => {
+        if (group.getBoundingClientRect().top - top <= 40) active = index;
+      });
+      setActive(atBottom && scroller.scrollTop > 0 ? groups.length - 1 : active);
+    };
+
+    scroller.addEventListener('scroll', update, { passive: true });
+    update();
+  };
+  bindScroll();
+}
+
 async function showWorldInfoPopup(messageId) {
   const worldInfoData = chat?.[messageId]?.extra?.worldInfoViewer;
   if (!worldInfoData) {
@@ -371,10 +447,14 @@ async function showWorldInfoPopup(messageId) {
   const translatedData = retranslateWorldInfoData(worldInfoData);
 
   try {
-    const popupContent = await renderExtensionTemplateAsync(extensionName, 'popup', {
+    const popupHtml = await renderExtensionTemplateAsync(extensionName, 'popup', {
       positions: translatedData,
       i18n: getLocaleData(),
     });
+
+    const popupContent = document.createElement('div');
+    popupContent.innerHTML = popupHtml;
+    setupViewerInteractions(popupContent);
 
     callGenericPopup(popupContent, POPUP_TYPE.TEXT, '', {
       wide: true,

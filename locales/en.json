@@ -49,6 +49,7 @@
     "popupTitle": "Triggered World Info Viewer",
     "popupClose": "Close",
     "popupNoEntries": "No World Info entries were triggered for this message.",
+    "popupToggleSection": "Click to collapse / expand",
 
     "viewerBtnTitle": "View triggered World Info for this response",
     "noWorldInfoData": "No recorded World Info data for this message.",
@@ -150,7 +151,7 @@
     "worldManagerPriorityKeywordsPlaceholder": "e.g. memory, combat, profile",
     "worldManagerPrioritizeBound": "Prioritize character-bound worldbooks",
     "worldManagerSectionHide": "Hidden keywords",
-    "worldManagerHiddenKeywords": "Hide books that match keywords (comma separated):",
+    "worldManagerHiddenKeywords": "Hide books whose name matches keywords (comma separated, name only; they still appear when you pick one of their TAGs in Quick TAG):",
     "worldManagerHiddenKeywordsPlaceholder": "e.g. archived, dev, spoiler",
     "worldManagerSectionCustomOrder": "Custom drag order",
     "worldManagerCustomOrderHint": "Drag with the handle. This order is used when custom sort is selected.",

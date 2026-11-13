@@ -12,6 +12,8 @@ World Info Suite 是 SillyTavern 擴充功能，提供 World Info / Lorebook 的
 
 - 在 AI 訊息上顯示檢視按鈕，查看該回覆觸發的世界書條目。
 - 依插入位置分組，並顯示條目來源與狀態。
+- 點擊分組標題可收合／展開該區塊的條目。
+- 出現兩個以上分組時，左側顯示快速導覽圓點（游標停留顯示分組名稱），點擊可平滑捲動到該區塊。
 - 可展開查看關鍵字、次要過濾與內容等明細。
 - 預設保留最近 10 則訊息的觸發資料；可調整上限（`0` 為無限制）或一鍵清除快取。
 
@@ -42,8 +44,8 @@ World Info Suite 是 SillyTavern 擴充功能，提供 World Info / Lorebook 的
 
 - 管理按鈕位於世界書選擇器左側，點擊可開啟管理彈窗。
 - 提供建立時間、名稱及自訂拖拉排序模式。
-- 可設定優先關鍵字、角色綁定世界書優先與隱藏關鍵字。
-- 支援每本世界書的多重 TAG 與快速 TAG 篩選。
+- 可設定優先關鍵字、角色綁定世界書優先與隱藏關鍵字（隱藏關鍵字只比對世界書名稱）。
+- 支援每本世界書的多重 TAG 與快速 TAG 篩選：「全部」會先剔除隱藏書；點選某 TAG 時，擁有該 TAG 的書（含被隱藏者）仍會顯示。
 
 ### 設定選項
 
@@ -59,6 +61,8 @@ World Info Suite is a SillyTavern extension that provides World Info / Lorebook 
 
 - Adds a viewer button to AI messages for inspecting the World Info entries triggered by that response.
 - Groups entries by insertion position and displays their source and state.
+- Click a group heading to collapse or expand its entries.
+- With two or more groups, a column of navigation dots appears on the left (hover for the group name); click one to smooth-scroll to that section.
 - Lets you expand entries to inspect keywords, secondary filters, content, and other details.
 - Keeps trigger data for the latest 10 messages by default; adjust the limit (`0` is unlimited) or clear the cache in one action.
 
@@ -89,8 +93,8 @@ World Info Suite is a SillyTavern extension that provides World Info / Lorebook 
 
 - Opens from the control to the left of the World Info selector.
 - Provides creation-time, name, and custom drag-order sorting modes.
-- Supports priority keywords, character-bound worldbook priority, and hidden keywords.
-- Supports multiple TAGs per worldbook and quick TAG filtering.
+- Supports priority keywords, character-bound worldbook priority, and hidden keywords (matched against worldbook names only).
+- Supports multiple TAGs per worldbook and quick TAG filtering: "All" removes hidden books first; picking a TAG still shows every book carrying it, including hidden ones.
 
 ### Settings
 

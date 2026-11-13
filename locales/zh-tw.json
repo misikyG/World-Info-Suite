@@ -49,6 +49,7 @@
     "popupTitle": "世界書觸發檢視",
     "popupClose": "關閉",
     "popupNoEntries": "此訊息沒有觸發任何世界書。",
+    "popupToggleSection": "點擊收合／展開",
 
     "viewerBtnTitle": "查看此回覆觸發的世界書",
     "noWorldInfoData": "此訊息沒有紀錄的世界書觸發資料。",
@@ -150,7 +151,7 @@
     "worldManagerPriorityKeywordsPlaceholder": "例如：記憶, 戰鬥, 劇情",
     "worldManagerPrioritizeBound": "角色綁定世界書優先",
     "worldManagerSectionHide": "隱藏關鍵字",
-    "worldManagerHiddenKeywords": "符合關鍵字時隱藏世界書（逗號分隔）：",
+    "worldManagerHiddenKeywords": "世界書名稱符合關鍵字時隱藏（逗號分隔，只比對名稱；在快速 TAG 點選該書所屬 TAG 時仍會顯示）：",
     "worldManagerHiddenKeywordsPlaceholder": "例如：封存, 測試, 劇透",
     "worldManagerSectionCustomOrder": "拖拉自定義排序",
     "worldManagerCustomOrderHint": "用把手拖拉排序，當排序模式為「自定義拖拉排序」時會套用。",
